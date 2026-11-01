@@ -1,0 +1,6 @@
+# comment
+OWNER=root
+PLAN=default
+FEATURELIST=default
+
+DNS=bob.example.com

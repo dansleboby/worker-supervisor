@@ -1,0 +1,6 @@
+OWNER=root
+PLAN=wsv
+FEATURELIST=default
+_PACKAGE_EXTENSIONS=other worker_supervisor
+worker_supervisor_max_processes=20
+worker_supervisor_tpl_custom=0

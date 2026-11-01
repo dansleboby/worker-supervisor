@@ -1,0 +1,21 @@
+{
+    "hook": {
+        "weight": "300",
+        "hook": "/usr/local/cpanel/3rdparty/bin/wsv_capture_stub",
+        "stage": "post",
+        "escalateprivs": "0",
+        "exectype": "script",
+        "id": "72c07d86-2eef-4b7f-9a77-6548f5ae41f7"
+    },
+    "data": {
+        "user": "wnoshell",
+        "cur_pkg": "default",
+        "new_pkg": "wsvtest"
+    },
+    "context": {
+        "event": "Accounts::change_package",
+        "category": "Whostmgr",
+        "stage": "post",
+        "point": "main"
+    }
+}

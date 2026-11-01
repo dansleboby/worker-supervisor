@@ -1,0 +1,26 @@
+{
+    "context": {
+        "category": "Whostmgr",
+        "event": "Accounts::suspendacct",
+        "stage": "post",
+        "point": "main",
+        "escalateprivs": 1
+    },
+    "hook": {
+        "id": "d93ca78e-0ff4-42d5-a3bc-31ace3a89af8",
+        "exectype": "script",
+        "stage": "post",
+        "hook": "/usr/local/cpanel/3rdparty/bin/wsv_capture_stub",
+        "escalateprivs": "0",
+        "weight": "400"
+    },
+    "data": {
+        "user": "root",
+        "args": {
+            "disallowun": 0,
+            "user": "wnoshell",
+            "reason": "wsvtest"
+        },
+        "result": 1
+    }
+}

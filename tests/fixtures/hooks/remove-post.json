@@ -1,0 +1,22 @@
+{
+    "hook": {
+        "id": "e2032610-d937-4cce-81c9-abb43853e366",
+        "exectype": "script",
+        "escalateprivs": "0",
+        "stage": "post",
+        "hook": "/usr/local/cpanel/3rdparty/bin/wsv_capture_stub",
+        "weight": "700"
+    },
+    "data": {
+        "killdns": 1,
+        "user": "wsvtmp",
+        "keep_remote_databases": 0,
+        "if_child": null
+    },
+    "context": {
+        "stage": "post",
+        "point": "main",
+        "category": "Whostmgr",
+        "event": "Accounts::Remove"
+    }
+}

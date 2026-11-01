@@ -1,0 +1,128 @@
+/* Worker Supervisor - WHM pages, on top of WHM's own styles; everything is scoped under .wsv. */
+
+.wsv [hidden] { display: none !important; }
+
+.wsv { max-width: 1200px; }
+.wsv-title { margin: 0 0 12px; }
+.wsv-subtitle { margin: 18px 0 10px; font-size: 20px; overflow-wrap: anywhere; }
+.wsv-muted { opacity: .75; }
+.wsv-version { margin-top: 24px; font-size: 12px; }
+.wsv-nowrap { white-space: nowrap; }
+
+.wsv-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #9aa4b2;
+}
+.wsv-nav > a {
+  margin-bottom: -1px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  color: inherit;
+  text-decoration: none;
+}
+.wsv-nav > a[aria-current="page"] {
+  border-color: #9aa4b2;
+  background: rgba(100, 116, 139, .10);
+  font-weight: 600;
+}
+
+.wsv-alert { overflow-wrap: anywhere; }
+
+.wsv-health {
+  margin: 0 0 12px;
+  padding: 6px 10px;
+  border: 1px solid rgba(21, 128, 61, .35);
+  border-radius: 6px;
+  background: rgba(21, 128, 61, .08);
+}
+.wsv-health--down {
+  border-color: rgba(185, 28, 28, .35);
+  background: rgba(185, 28, 28, .08);
+}
+.wsv-health--down > strong,
+.wsv-health-failed { color: #b91c1c; font-weight: 600; }
+
+.wsv-filters,
+.wsv-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+.wsv-filters [role="group"] { display: flex; flex-wrap: wrap; gap: 4px; }
+.wsv-filters .btn[aria-pressed="true"] {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, .15);
+  font-weight: 600;
+}
+.wsv-search,
+.wsv-bar > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-weight: normal;
+}
+.wsv-search input { width: 200px; }
+
+.wsv-table > tbody > tr > td { vertical-align: top; }
+.wsv-folder { font-size: 12px; opacity: .75; overflow-wrap: anywhere; }
+
+.wsv-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wsv-pill--ok { background: #dcfce7; color: #166534; }
+.wsv-pill--busy { background: #dbeafe; color: #1e40af; }
+.wsv-pill--off { background: #e2e8f0; color: #334155; }
+.wsv-pill--bad { background: #fee2e2; color: #991b1b; }
+.wsv-pill--warn { background: #fef3c7; color: #92400e; }
+
+.wsv-why,
+.wsv-hint { margin-top: 3px; font-size: 12px; }
+.wsv-why { color: #991b1b; }
+
+.wsv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+}
+
+.wsv-pre {
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.wsv-log { min-height: 240px; }
+
+.wsv-section { margin-bottom: 28px; }
+.wsv-form { max-width: 560px; }
+.wsv-form legend { font-size: 14px; font-weight: 600; border: 0; margin-bottom: 4px; }
+.wsv-indent { margin-left: 22px; }
+.wsv-field-error { margin-top: 4px; color: #b91c1c; font-size: 13px; }
+.wsv-form [aria-invalid="true"] { border-color: #b91c1c; }
+
+.wsv-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

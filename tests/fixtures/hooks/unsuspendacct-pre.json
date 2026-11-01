@@ -1,0 +1,24 @@
+{
+    "context": {
+        "escalateprivs": 1,
+        "stage": "pre",
+        "point": "main",
+        "event": "Accounts::unsuspendacct",
+        "category": "Whostmgr"
+    },
+    "data": {
+        "result": 1,
+        "args": {
+            "user": "wnoshell"
+        },
+        "user": "root"
+    },
+    "hook": {
+        "weight": "300",
+        "escalateprivs": "0",
+        "hook": "/usr/local/cpanel/3rdparty/bin/wsv_capture_stub",
+        "stage": "pre",
+        "exectype": "script",
+        "id": "8db469ec-166a-48f3-a2e5-d7e5c2af3e42"
+    }
+}

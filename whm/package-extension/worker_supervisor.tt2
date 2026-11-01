@@ -1,0 +1,56 @@
+[%# data.defaults lacks keys the package never stored (enabling the extension on an existing package), so fall back to the shipped defaults.
+   Block IF on purpose: a postfix 'x = 10 IF x == ""' blanks x when the condition is false. %]
+[% bw_max_processes = data.defaults.worker_supervisor_max_processes; IF bw_max_processes == ''; bw_max_processes = 10; END %]
+[% bw_max_workers = data.defaults.worker_supervisor_max_workers; IF bw_max_workers == ''; bw_max_workers = 5; END %]
+[% bw_max_stopwaitsecs = data.defaults.worker_supervisor_max_stopwaitsecs; IF bw_max_stopwaitsecs == ''; bw_max_stopwaitsecs = 3600; END %]
+[% bw_tpl_laravel_queue = data.defaults.worker_supervisor_tpl_laravel_queue; IF bw_tpl_laravel_queue == ''; bw_tpl_laravel_queue = 1; END %]
+[% bw_tpl_laravel_horizon = data.defaults.worker_supervisor_tpl_laravel_horizon; IF bw_tpl_laravel_horizon == ''; bw_tpl_laravel_horizon = 1; END %]
+[% bw_tpl_symfony_messenger = data.defaults.worker_supervisor_tpl_symfony_messenger; IF bw_tpl_symfony_messenger == ''; bw_tpl_symfony_messenger = 1; END %]
+[% bw_tpl_custom = data.defaults.worker_supervisor_tpl_custom; IF bw_tpl_custom == ''; bw_tpl_custom = 1; END %]
+<div class="propertyEditor">
+    <div class="propertyLabel">[% locale.maketext('Max processes') %]</div>
+    <div class="propertyValue">
+        <input id="worker_supervisor_max_processes" type="number" min="0" name="worker_supervisor_max_processes" value="[% bw_max_processes | html %]">
+    </div>
+</div>
+
+<div class="propertyEditor">
+    <div class="propertyLabel">[% locale.maketext('Max workers') %]</div>
+    <div class="propertyValue">
+        <input id="worker_supervisor_max_workers" type="number" min="0" name="worker_supervisor_max_workers" value="[% bw_max_workers | html %]">
+    </div>
+</div>
+
+<div class="propertyEditor">
+    <div class="propertyLabel">[% locale.maketext('Max stop wait (seconds)') %]</div>
+    <div class="propertyValue">
+        <input id="worker_supervisor_max_stopwaitsecs" type="number" min="0" name="worker_supervisor_max_stopwaitsecs" value="[% bw_max_stopwaitsecs | html %]">
+    </div>
+</div>
+
+<div class="propertyEditor">
+    <div class="propertyLabel">[% locale.maketext('Allowed templates') %]</div>
+    <div class="propertyValue">
+        <label for="worker_supervisor_tpl_laravel_queue">[% locale.maketext('Laravel queue') %]</label>
+        <select id="worker_supervisor_tpl_laravel_queue" name="worker_supervisor_tpl_laravel_queue">
+            <option value="1"[% IF bw_tpl_laravel_queue == '1' %] selected="selected"[% END %]>[% locale.maketext('Allowed') %]</option>
+            <option value="0"[% IF bw_tpl_laravel_queue != '1' %] selected="selected"[% END %]>[% locale.maketext('Not allowed') %]</option>
+        </select><br>
+        <label for="worker_supervisor_tpl_laravel_horizon">[% locale.maketext('Laravel Horizon') %]</label>
+        <select id="worker_supervisor_tpl_laravel_horizon" name="worker_supervisor_tpl_laravel_horizon">
+            <option value="1"[% IF bw_tpl_laravel_horizon == '1' %] selected="selected"[% END %]>[% locale.maketext('Allowed') %]</option>
+            <option value="0"[% IF bw_tpl_laravel_horizon != '1' %] selected="selected"[% END %]>[% locale.maketext('Not allowed') %]</option>
+        </select><br>
+        <label for="worker_supervisor_tpl_symfony_messenger">[% locale.maketext('Symfony Messenger') %]</label>
+        <select id="worker_supervisor_tpl_symfony_messenger" name="worker_supervisor_tpl_symfony_messenger">
+            <option value="1"[% IF bw_tpl_symfony_messenger == '1' %] selected="selected"[% END %]>[% locale.maketext('Allowed') %]</option>
+            <option value="0"[% IF bw_tpl_symfony_messenger != '1' %] selected="selected"[% END %]>[% locale.maketext('Not allowed') %]</option>
+        </select><br>
+        <label for="worker_supervisor_tpl_custom">[% locale.maketext('Custom command') %]</label>
+        <select id="worker_supervisor_tpl_custom" name="worker_supervisor_tpl_custom">
+            <option value="1"[% IF bw_tpl_custom == '1' %] selected="selected"[% END %]>[% locale.maketext('Allowed') %]</option>
+            <option value="0"[% IF bw_tpl_custom != '1' %] selected="selected"[% END %]>[% locale.maketext('Not allowed') %]</option>
+        </select><br>
+        <small>[% locale.maketext('Templates simplify the form; they are not a security limit.') %]</small>
+    </div>
+</div>

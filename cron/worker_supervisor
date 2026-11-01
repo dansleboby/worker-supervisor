@@ -1,0 +1,2 @@
+# Worker Supervisor: repairs what the account hooks missed (feature-list edits have no hook).
+*/5 * * * * root /usr/local/cpanel/3rdparty/worker_supervisor/bin/wsv reconcile >/dev/null 2>&1

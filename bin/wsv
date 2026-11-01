@@ -1,0 +1,49 @@
+#!/usr/local/cpanel/3rdparty/bin/php
+<?php
+
+declare(strict_types=1);
+
+// Entry point from the cPanel admin module and cron: `wsv <action>`, request JSON on stdin (none for
+// root actions such as `wsv reconcile`), one JSON line on stdout. `wsv --version` prints the release.
+
+// stdout reaches the client: PHP diagnostics (paths, messages) must only ever go to stderr.
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ini_set('error_log', 'php://stderr');
+
+const WSV_INTERNAL = '{"ok":false,"error":{"code":"internal","params":{},"issues":[]}}' . "\n";
+
+// Also to syslog: cron discards `wsv reconcile` output.
+$log = static function (Throwable $e): void {
+    $message = 'wsv: ' . $e::class . ': ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine();
+    openlog('worker_supervisor', LOG_PID, LOG_DAEMON);
+    syslog(LOG_ERR, $message);
+    fwrite(STDERR, $message . "\n");
+};
+
+try {
+    require dirname(__DIR__) . '/src/autoload.php';
+
+    if (($argv[1] ?? '') === '--version') {
+        echo \WorkerSupervisor\Version::read(dirname(__DIR__) . '/VERSION'), "\n";
+        exit(0);
+    }
+
+    if (posix_geteuid() !== 0) {
+        // The core writes root-owned files; never run it as anyone else.
+        fwrite(STDERR, "wsv: must run as root\n");
+        echo WSV_INTERNAL;
+        exit(1);
+    }
+
+    $services = \WorkerSupervisor\Container::build(new \WorkerSupervisor\Paths());
+    $action = $argv[1] ?? '';
+    $stdin = \WorkerSupervisor\Cli::needsStdin($action) ? (string) stream_get_contents(STDIN) : '';
+    $out = \WorkerSupervisor\Cli::run($action, $stdin, $services, $log);
+    echo $out;
+    exit((json_decode($out, true)['error']['code'] ?? '') === 'internal' ? 1 : 0);
+} catch (Throwable $e) {
+    $log($e);
+    echo WSV_INTERNAL;
+    exit(1);
+}

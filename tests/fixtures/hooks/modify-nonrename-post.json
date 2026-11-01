@@ -1,0 +1,22 @@
+{
+    "context": {
+        "stage": "post",
+        "point": "main",
+        "category": "Whostmgr",
+        "event": "Accounts::Modify"
+    },
+    "data": {
+        "account_enhancements": [],
+        "user": "wnoshell",
+        "MAXFTP": "unlimited",
+        "LOCALE": null
+    },
+    "hook": {
+        "escalateprivs": "0",
+        "hook": "/usr/local/cpanel/3rdparty/bin/wsv_capture_stub",
+        "weight": "1000",
+        "id": "9fd1431d-2e5f-4537-addf-337c281f2be4",
+        "exectype": "script",
+        "stage": "post"
+    }
+}

@@ -1,0 +1,29 @@
+#!/bin/bash
+# Started by supervisord as root. Args are plugin-generated; folder and command come
+# from the root-only launch file and are passed to bash as positional parameters, so
+# supervisord never parses client text.
+set -euo pipefail
+# stderr lands in the worker's log, which the client reads: never print launch file content.
+refuse() { echo "wsv-run: $*" >&2; exit 64; }
+user=$1 name=$2
+[[ $user =~ ^[a-z][a-z0-9]{0,15}$ && $name =~ ^[a-z0-9][a-z0-9-]{0,31}$ ]] || refuse "invalid arguments"
+# cagefs_enter_user also accepts system accounts such as nobody.
+[[ -f /var/cpanel/users/$user ]] || refuse "$user is not a cPanel account"
+# Last line of defence against a start job that ran after root stopped the worker: jobs are
+# serialized but not ordered. The plugin writes the hold file for every stop of root's.
+[[ ! -e /var/cpanel/suspended/$user ]] || refuse "the account $user is suspended"
+dir=/var/cpanel/worker_supervisor/launch/$user
+[[ ! -e $dir/$name.hold ]] || refuse "${user}_$name is held by the server administrator"
+# The third line, the uid the workers were stored for, is absent from launch files written before
+# it existed; install.sh's reconcile rewrites them.
+{ IFS= read -r folder; IFS= read -r command; IFS= read -r uid || true; } < "$dir/$name"
+pw=$(getent passwd "$user") || refuse "$user has no system user"
+IFS=: read -r _ _ current _ _ home _ <<<"$pw"
+# A later account given the name of a removed one must never run that client's commands.
+[[ -z $uid || $uid == "$current" ]] || refuse "the account $user is not the one these workers belong to"
+# bash -c execs a lone simple command in place (supervisord's direct child: graceful
+# stop, no orphans); compound commands run under it in the same process group.
+exec /usr/bin/env -i HOME="$home" USER="$user" LOGNAME="$user" SHELL=/bin/bash \
+  PATH=/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 \
+  /usr/sbin/cagefs_enter_user --no-fork "$user" \
+  /bin/bash -lc 'cd -- "$1" && exec /bin/bash -c "$2"' wsv-run "$folder" "$command"

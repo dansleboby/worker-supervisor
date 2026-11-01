@@ -1,0 +1,22 @@
+{
+    "context": {
+        "point": "main",
+        "stage": "pre",
+        "blocking": 1,
+        "category": "Whostmgr",
+        "event": "Accounts::change_package"
+    },
+    "data": {
+        "user": "wnoshell",
+        "new_pkg": "wsvtest",
+        "cur_pkg": "default"
+    },
+    "hook": {
+        "exectype": "script",
+        "id": "a2e562f5-bc90-4af9-aaec-9cc38b8a000b",
+        "stage": "pre",
+        "weight": "200",
+        "hook": "/usr/local/cpanel/3rdparty/bin/wsv_capture_stub",
+        "escalateprivs": "0"
+    }
+}

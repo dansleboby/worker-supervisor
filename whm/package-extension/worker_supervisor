@@ -1,0 +1,8 @@
+_NAME=Worker Supervisor
+worker_supervisor_max_processes=10
+worker_supervisor_max_workers=5
+worker_supervisor_max_stopwaitsecs=3600
+worker_supervisor_tpl_laravel_queue=1
+worker_supervisor_tpl_laravel_horizon=1
+worker_supervisor_tpl_symfony_messenger=1
+worker_supervisor_tpl_custom=1

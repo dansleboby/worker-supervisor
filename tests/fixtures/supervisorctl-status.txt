@@ -1,0 +1,5 @@
+bob_queue:bob_queue_00           RUNNING   pid 123, uptime 2:14:03
+bob_queue:bob_queue_01           RUNNING   pid 124, uptime 1 day, 2:14:03
+bob_queue:bob_queue_02           FATAL     Exited too quickly (process log may have details)
+bob_sched:bob_sched_00           STOPPED   Oct 31 10:00 AM
+bob_sched:bob_sched_01           STOPPED   Not started

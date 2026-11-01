@@ -1,0 +1,14 @@
+[
+    {
+        "type": "link",
+        "id": "worker_supervisor",
+        "group_id": "advanced",
+        "name": "Worker Supervisor",
+        "icon": "worker_supervisor.svg",
+        "order": 100,
+        "uri": "worker_supervisor/index.live.php",
+        "featuremanager": 1,
+        "feature": "worker_supervisor",
+        "description": "Worker Supervisor"
+    }
+]

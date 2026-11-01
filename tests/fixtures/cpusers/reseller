@@ -1,0 +1,6 @@
+OWNER=resellerx
+PLAN=wsv
+FEATURELIST=default
+_PACKAGE_EXTENSIONS=worker_supervisor
+worker_supervisor_max_processes=20
+worker_supervisor_tpl_custom=0

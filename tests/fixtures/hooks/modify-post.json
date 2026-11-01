@@ -1,0 +1,22 @@
+{
+    "hook": {
+        "stage": "post",
+        "id": "9fd1431d-2e5f-4537-addf-337c281f2be4",
+        "exectype": "script",
+        "escalateprivs": "0",
+        "hook": "/usr/local/cpanel/3rdparty/bin/wsv_capture_stub",
+        "weight": "1000"
+    },
+    "data": {
+        "newuser": "wnoshell2",
+        "LOCALE": null,
+        "account_enhancements": [],
+        "user": "wnoshell"
+    },
+    "context": {
+        "point": "main",
+        "stage": "post",
+        "event": "Accounts::Modify",
+        "category": "Whostmgr"
+    }
+}

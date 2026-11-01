@@ -1,0 +1,40 @@
+#!/usr/local/cpanel/3rdparty/bin/php -q
+<?php
+
+declare(strict_types=1);
+
+// Whostmgr standardized hook, installed as /usr/local/cpanel/3rdparty/bin/worker_supervisor_hook.
+// One JSON object on stdin: {context: {category, event, stage, point}, data, hook}.
+//
+// Payload fields, captured on cPanel 11.138 (tests/fixtures/hooks/):
+// - Accounts::suspendacct / unsuspendacct: the account is data.args.user; data.user is whoever
+//   acted ("root" or a reseller), never the account.
+// - Accounts::Modify: data.user is the old username and data.newuser the new one, identical at
+//   pre and post; newuser is absent when the username does not change.
+// - Accounts::Remove, Accounts::change_package: data.user (plus cur_pkg and new_pkg).
+//
+// Always prints a bare "1": cPanel keeps any text after the status as a hook message, and
+// scripts/suspendacct fails the suspension when a pre hook leaves one, so even "1 ok" can block
+// account management. Failures go to syslog and to stderr, which cPanel copies to its error_log.
+
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ini_set('error_log', 'php://stderr');
+
+try {
+    $input = (string) stream_get_contents(STDIN);
+    require '/usr/local/cpanel/3rdparty/worker_supervisor/src/autoload.php';
+
+    $payload = json_decode($input, true);
+    if (is_array($payload) && \WorkerSupervisor\Lifecycle::route($payload) !== null) {
+        \WorkerSupervisor\Container::build(new \WorkerSupervisor\Paths())['lifecycle']->handle($payload);
+    }
+} catch (Throwable $e) {
+    $detail = $e::class . ': ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine();
+    openlog('worker_supervisor', LOG_PID, LOG_DAEMON);
+    syslog(LOG_ERR, 'hook: ' . $detail);
+    fwrite(STDERR, 'worker_supervisor_hook: ' . $detail . "\n");
+}
+
+echo '1';
+exit(0);
