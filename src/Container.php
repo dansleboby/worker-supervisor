@@ -10,7 +10,7 @@ use WorkerSupervisor\Supervisor\Supervisorctl;
 /** Wires the production object graph. Tests build their own from fakes. */
 final class Container
 {
-    /** @return array{service: Service, admin: AdminService, lifecycle: Lifecycle, importer: Importer} */
+    /** @return array{service: Service, admin: AdminService, lifecycle: Lifecycle, importer: Importer, backup: Backup} */
     public static function build(Paths $p): array
     {
         $runner = new ShellRunner();
@@ -21,6 +21,8 @@ final class Container
         $sv = new Supervisorctl($runner);
         $cpusers = static fn (string $user): ?CpUser => CpUser::load($p, $user);
         $logs = new Logs($p);
+        $validator = new WorkerValidator(new LveProbe($runner));
+        $features = new WhmapiFeatureChecker($runner);
 
         $service = new Service(
             $p,
@@ -29,7 +31,7 @@ final class Container
             $ini,
             $sv,
             $logs,
-            new WorkerValidator(new LveProbe($runner)),
+            $validator,
             $cpusers,
         );
 
@@ -37,7 +39,8 @@ final class Container
             'service' => $service,
             'admin' => new AdminService($service, $store, $settings, $sv, $cpusers, $ini),
             'importer' => new Importer($p, $service, $sv, $ini),
-            'lifecycle' => new Lifecycle($store, $settings, $ini, $sv, $logs, $cpusers, new WhmapiFeatureChecker($runner)),
+            'lifecycle' => new Lifecycle($store, $settings, $ini, $sv, $logs, $cpusers, $features),
+            'backup' => new Backup($p, $store, $settings, $ini, $sv, new WorkerValidator(new NullProbe()), $cpusers, $features),
         ];
     }
 }

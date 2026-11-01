@@ -10,7 +10,7 @@ use RuntimeException;
 /** Root-owned per-account JSON persistence. Use transaction() for any read-modify-write. */
 final class AccountStore
 {
-    private const MARKERS = ['renaming', 'removing'];
+    private const MARKERS = ['renaming', 'removing', 'restoring'];
 
     public function __construct(private readonly Paths $paths)
     {
@@ -165,20 +165,42 @@ final class AccountStore
         if (!rename($from, $to)) {
             throw new RuntimeException("Cannot rename $from.");
         }
+        // A restore still waiting for its folders follows the account; the others end with the rename.
+        $this->moveMarker($old, $new, 'restoring');
         foreach (self::MARKERS as $kind) {
             $this->unmark($old, $kind);
         }
     }
 
     /**
-     * Records a cPanel operation in progress on the account (renaming, removing) for the processes
-     * that run after this one: the post hook and reconcile. Call under withLock().
+     * Records an operation in progress on the account (renaming, removing, restoring) for the
+     * processes that run after this one: the post hook and reconcile. Call under withLock().
      */
     public function mark(string $user, string $kind, string $value = ''): void
     {
         $file = $this->markerPath($user, $kind);
-        if (file_put_contents($file, $value) === false) {
+        $this->ensureDir(dirname($file));
+        // Renamed into place: marker() is also read without the lock.
+        $tmp = $file . '.tmp.' . bin2hex(random_bytes(6));
+        $fh = fopen($tmp, 'xe');
+        if ($fh === false) {
+            throw new RuntimeException("Cannot create $tmp.");
+        }
+        chmod($tmp, 0600);
+        $ok = fwrite($fh, $value) !== false && fflush($fh);
+        fclose($fh);
+        if (!$ok || !rename($tmp, $file)) {
+            @unlink($tmp);
             throw new RuntimeException("Cannot write $file.");
+        }
+    }
+
+    /** Call holding both accounts' locks (withLocks). */
+    public function moveMarker(string $old, string $new, string $kind): void
+    {
+        $from = $this->markerPath($old, $kind);
+        if (is_file($from) && !rename($from, $this->markerPath($new, $kind))) {
+            throw new RuntimeException("Cannot rename $from.");
         }
     }
 
@@ -199,6 +221,20 @@ final class AccountStore
         if (is_file($file) && !unlink($file)) {
             throw new RuntimeException("Cannot remove $file.");
         }
+    }
+
+    /** @return string[] accounts with that marker, account file or not */
+    public function markedUsers(string $kind): array
+    {
+        $suffix = '.json.' . $kind;
+        $this->markerPath('x', $kind);
+        $users = [];
+        foreach (glob(dirname($this->paths->accountFile('x')) . '/*' . $suffix) ?: [] as $f) {
+            $users[] = substr(basename($f), 0, -strlen($suffix));
+        }
+        sort($users);
+
+        return $users;
     }
 
     /** @return string[] */

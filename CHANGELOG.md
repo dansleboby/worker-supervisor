@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-11-01
+
+- Workers are now part of account backups and come back on restore: a pkgacct component adds them to cPanel backups, transfers and JetBackup 5 backups, and a `PkgAcct::Restore` hook restores them in their saved state, validated against the limits of the restoring server. Workers whose folder is not restored yet (JetBackup restores the home directory last) are added by reconcile once it exists.
+- The uninstaller removes the upcp marker of the WHM app.
+- Core files are opened close-on-exec, so no lock reaches a client's processes.
+
 ## [1.0.0] - 2026-11-01
 
 First public release.
@@ -15,4 +21,5 @@ First public release.
 - Account suspension, termination, username change and package change handled by cPanel hooks; a 5-minute reconcile repairs drift.
 - English and French interface.
 
+[1.1.0]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.0.0

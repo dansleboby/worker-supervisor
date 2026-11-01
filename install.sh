@@ -77,6 +77,9 @@ install_module() {
 install_module "$src/perl/Cpanel/Admin/Modules/WorkerSupervisor/Workers.pm" \
   /var/cpanel/perl/Cpanel/Admin/Modules/WorkerSupervisor/Workers.pm
 install_module "$src/perl/Cpanel/API/WorkerSupervisor.pm" /usr/local/cpanel/Cpanel/API/WorkerSupervisor.pm
+# Custom pkgacct component: adds the account's workers to cPanel and JetBackup account backups.
+install_module "$src/perl/Cpanel/Pkgacct/Components/WorkerSupervisor.pm" \
+  /var/cpanel/perl/Cpanel/Pkgacct/Components/WorkerSupervisor.pm
 
 # install_plugin adds the icon and the Feature Manager entry but copies no pages, so the pages go
 # first: the icon never links to a missing page.
@@ -112,16 +115,21 @@ hook=/usr/local/cpanel/3rdparty/bin/worker_supervisor_hook
 install -m 0755 -o root -g root "$src/bin/wsv-hook" "$hook.new"
 mv -f "$hook.new" "$hook"
 registered=$(/usr/local/cpanel/bin/manage_hooks list --output JSON | /usr/local/cpanel/3rdparty/bin/php -r '
-  foreach (json_decode(stream_get_contents(STDIN), true)["Whostmgr"] ?? [] as $event => $hooks) {
-    foreach ($hooks as $h) {
-      if (($h["hook"] ?? "") === $argv[1]) { echo $event, ":", $h["stage"], "\n"; }
+  foreach (json_decode(stream_get_contents(STDIN), true) ?? [] as $category => $events) {
+    foreach (is_array($events) ? $events : [] as $event => $hooks) {
+      foreach (is_array($hooks) ? $hooks : [] as $h) {
+        if (($h["hook"] ?? "") === $argv[1]) { echo $category, ":", $event, ":", $h["stage"], "\n"; }
+      }
     }
   }' "$hook")
-for spec in Accounts::suspendacct:post Accounts::unsuspendacct:post Accounts::Remove:pre Accounts::Remove:post \
-  Accounts::Modify:pre Accounts::Modify:post Accounts::change_package:post; do
+# <category>:<event>:<stage>; PkgAcct:Restore:post restores the workers of a restored account.
+for spec in Whostmgr:Accounts::suspendacct:post Whostmgr:Accounts::unsuspendacct:post \
+  Whostmgr:Accounts::Remove:pre Whostmgr:Accounts::Remove:post Whostmgr:Accounts::Modify:pre \
+  Whostmgr:Accounts::Modify:post Whostmgr:Accounts::change_package:post PkgAcct:Restore:post; do
   grep -qxF "$spec" <<<"$registered" && continue
-  out=$(/usr/local/cpanel/bin/manage_hooks add script "$hook" --manual 1 --category Whostmgr \
-    --event "${spec%:*}" --stage "${spec##*:}" 2>&1) || die "manage_hooks add $spec failed: $out"
+  event=${spec#*:}
+  out=$(/usr/local/cpanel/bin/manage_hooks add script "$hook" --manual 1 --category "${spec%%:*}" \
+    --event "${event%:*}" --stage "${spec##*:}" 2>&1) || die "manage_hooks add $spec failed: $out"
 done
 install -m 0644 -o root -g root "$src/cron/worker_supervisor" /etc/cron.d/worker_supervisor
 

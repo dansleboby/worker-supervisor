@@ -151,6 +151,24 @@ final class AccountStoreTest extends TestCase
         $this->assertSame('bob', $this->store->load('bob')->user);
     }
 
+    public function test_a_waiting_restore_follows_a_rename_and_ends_with_a_delete(): void
+    {
+        $this->store->save(new Account('alice'));
+        $this->store->mark('alice', 'restoring', '{"x":1}');
+        $this->store->mark('alice', 'renaming', 'bob');
+        $this->assertSame(['alice'], $this->store->markedUsers('restoring'));
+
+        $this->store->rename('alice', 'bob');
+
+        $this->assertSame('{"x":1}', $this->store->marker('bob', 'restoring')['value']);
+        $this->assertNull($this->store->marker('alice', 'restoring'));
+        $this->assertNull($this->store->marker('bob', 'renaming'));
+        $this->assertSame(['bob'], $this->store->markedUsers('restoring'));
+
+        $this->store->delete('bob');
+        $this->assertSame([], $this->store->markedUsers('restoring'));
+    }
+
     public function test_rename_refuses_existing_target(): void
     {
         $this->store->save(new Account('alice'));

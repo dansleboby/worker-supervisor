@@ -23,6 +23,9 @@ final class Cli
      */
     private const ADMIN_ACTIONS = ['admin_stop', 'admin_release', 'admin_start', 'admin_restart', 'admin_config'];
 
+    /** Root reading an account for its backup (the pkgacct component): {"user": ...} on stdin. */
+    private const BACKUP_ACTIONS = ['backup_export'];
+
     private const USER_ACTIONS = [
         'list', 'get', 'validate', 'save', 'delete', 'start', 'stop', 'restart', 'logs', 'clear_logs', 'templates',
     ];
@@ -34,7 +37,7 @@ final class Cli
     }
 
     /**
-     * @param array{service: Service, admin: AdminService, lifecycle: Lifecycle} $services
+     * @param array{service: Service, admin: AdminService, lifecycle: Lifecycle, backup: Backup} $services
      * @param (callable(Throwable): void)|null $onError receives unexpected throwables and the cause of a
      *                                           bad_request, for stderr
      * @return string one JSON line, newline included
@@ -44,6 +47,11 @@ final class Cli
         try {
             if (in_array($action, self::ROOT_ACTIONS, true)) {
                 return self::ok(self::root($action, $services));
+            }
+            if (in_array($action, self::BACKUP_ACTIONS, true)) {
+                [$user] = self::request($stdin);
+
+                return self::ok($services['backup']->export($user));
             }
             if (in_array($action, self::ADMIN_ACTIONS, true)) {
                 [$user, $args] = self::request($stdin);
@@ -130,14 +138,14 @@ final class Cli
         throw new InvalidArgumentException('Unknown action.');
     }
 
-    /** @param array{service: Service, admin: AdminService, lifecycle: Lifecycle} $services */
+    /** @param array{service: Service, admin: AdminService, lifecycle: Lifecycle, backup: Backup} $services */
     private static function root(string $action, array $services): mixed
     {
         switch ($action) {
             case 'overview':
                 return $services['admin']->overview();
             case 'reconcile':
-                return $services['lifecycle']->reconcile();
+                return $services['lifecycle']->reconcile() + ['restores' => $services['backup']->resumeAll()];
         }
         throw new InvalidArgumentException('Unknown action.');
     }

@@ -29,6 +29,7 @@ main() {
   dev/deploy.sh
   vm_test tests/vm/uapi.sh "UAPI OK"
   vm_test tests/vm/launcher.sh "LAUNCHER OK"
+  vm_test tests/vm/backup.sh "BACKUP OK"
   on_vm check_uninstall
   echo "CLEAN INSTALL OK"
 }
@@ -172,10 +173,12 @@ assert_removed() {
     data) allowed=(/var/cpanel/worker_supervisor /var/log/worker_supervisor) ;;
   esac
 
-  # Everything named after the plugin, outside the source copy, CageFS copies and cPanel's
-  # notification history (which keeps the AppConfig registration notice).
+  # Everything named after the plugin, outside the source copy, CageFS copies, cPanel's
+  # notification history (which keeps the AppConfig registration notice) and account backups
+  # (JetBackup's destinations and workspace on a VM that has it), which keep worker_supervisor.json.
   found=$(find / -xdev \( -path /proc -o -path /root/wsv-src -o -path /home/virtfs -o -path /var/cagefs \
-    -o -path /usr/share/cagefs-skeleton -o -path /var/cpanel/user_notifications \) -prune \
+    -o -path /usr/share/cagefs-skeleton -o -path /var/cpanel/user_notifications -o -path /backup \
+    -o -path /usr/local/jetapps \) -prune \
     -o \( -iname '*worker_supervisor*' -o -iname '*workersupervisor*' -o -name 'wsv_*' \) -print \
     | grep -vxF -f <(printf '%s\n' "${allowed[@]}" /nonexistent) || true)
   [[ -z $found ]] || fail "left behind: $found"

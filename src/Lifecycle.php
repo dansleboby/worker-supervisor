@@ -221,7 +221,8 @@ final class Lifecycle
     {
         $this->assertUser($user);
         // Every removed cPanel account comes through here; most never used the plugin and must not get a lock file.
-        $hasData = $this->store->exists($user) || $this->iniNames($user) !== [];
+        $hasData = $this->store->exists($user) || $this->iniNames($user) !== []
+            || $this->store->marker($user, 'restoring') !== null;
         $names = $hasData ? $this->removeFiles($user) : [];
 
         foreach ($names as $name) {
@@ -273,7 +274,15 @@ final class Lifecycle
     {
         $this->assertUser($old);
         $this->assertUser($new);
-        if ($old === $new || (!$this->store->exists($old) && $this->settings->override($old) === null)) {
+        if ($old === $new) {
+            return true;
+        }
+        if (!$this->store->exists($old) && $this->settings->override($old) === null) {
+            // A restore can wait with no account file yet: it follows the account all the same.
+            if ($this->store->marker($old, 'restoring') !== null && ($this->cpuserLoader)($new) !== null && $this->accountGone($old)) {
+                $this->store->withLocks([$old, $new], fn () => $this->store->moveMarker($old, $new, 'restoring'));
+            }
+
             return true;
         }
         $u = ($this->cpuserLoader)($new);

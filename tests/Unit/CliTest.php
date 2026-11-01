@@ -7,6 +7,7 @@ namespace WorkerSupervisor\Tests\Unit;
 use WorkerSupervisor\AccountProbe;
 use WorkerSupervisor\AccountStore;
 use WorkerSupervisor\AdminService;
+use WorkerSupervisor\Backup;
 use WorkerSupervisor\Cli;
 use WorkerSupervisor\CpUser;
 use WorkerSupervisor\IniRenderer;
@@ -63,12 +64,14 @@ final class CliTest extends TestCase
         $store = new AccountStore($paths);
         $settings = Settings::load($paths);
         $ini = new IniRenderer($paths);
-        $service = new Service($paths, $store, $settings, $ini, $sv, new Logs($paths), new WorkerValidator($probe), $loader);
+        $validator = new WorkerValidator($probe);
+        $service = new Service($paths, $store, $settings, $ini, $sv, new Logs($paths), $validator, $loader);
 
         return [
             'service' => $service,
             'admin' => new AdminService($service, $store, $settings, $sv, $loader, $ini),
             'lifecycle' => new Lifecycle($store, $settings, $ini, $sv, new Logs($paths), $loader, new FakeFeatures()),
+            'backup' => new Backup($paths, $store, $settings, $ini, $sv, $validator, $loader, new FakeFeatures(), static function (): void {}),
         ];
     }
 
@@ -196,6 +199,7 @@ final class CliTest extends TestCase
         self::assertTrue($r['ok'], json_encode($r));
         self::assertSame([], $r['data']['removed']);
         self::assertSame('checked', $r['data']['features']);
+        self::assertSame([], $r['data']['restores']);
         self::assertFalse(Cli::needsStdin('reconcile'));
         self::assertFalse(Cli::needsStdin('overview'));
         self::assertTrue(Cli::needsStdin('list'));
@@ -216,6 +220,20 @@ final class CliTest extends TestCase
         self::assertSame(['started' => true], $r['data']);
         self::assertSame('bad_request', $this->call('admin_stop', '{"user":"bob","args":{}}')['error']['code']);
         self::assertSame('bad_request', $this->call('admin_stop', '{"user":"../x","args":{"name":"w1"}}')['error']['code']);
+    }
+
+    public function test_backup_export_reads_the_named_account(): void
+    {
+        $folder = $this->root . '/home/bob';
+        self::assertNull($this->call('backup_export', '{"user":"bob"}')['data'], 'nothing stored for bob yet');
+
+        $this->call('save', '{"user":"bob","args":{"input":{"name":"w1","template":"custom","folder":"' . $folder . '","command":"sleep 1"}}}');
+        $r = $this->call('backup_export', '{"user":"bob"}');
+
+        self::assertTrue($r['ok'], json_encode($r));
+        self::assertSame(['w1'], array_column($r['data']['workers'], 'name'));
+        self::assertTrue(Cli::needsStdin('backup_export'));
+        self::assertSame('bad_request', $this->call('backup_export', '{"user":"../x"}')['error']['code']);
     }
 
     public function test_bad_request_is_a_declared_error_code(): void

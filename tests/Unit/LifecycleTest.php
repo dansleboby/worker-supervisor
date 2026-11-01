@@ -208,6 +208,28 @@ final class LifecycleTest extends TestCase
         $this->assertNotNull(Settings::load($this->paths)->override('alice'));
     }
 
+    public function test_remove_drops_a_restore_still_waiting_even_without_an_account_file(): void
+    {
+        $this->createInCpanel('bob');
+        $this->store->withLock('bob', fn () => $this->store->mark('bob', 'restoring', '{}'));
+
+        $this->lifecycle()->remove('bob');
+
+        $this->assertNull($this->store->marker('bob', 'restoring'));
+    }
+
+    public function test_rename_moves_a_restore_still_waiting_without_an_account_file(): void
+    {
+        $this->createInCpanel('bob');
+        $this->store->withLock('bob', fn () => $this->store->mark('bob', 'restoring', '{"x":1}'));
+        $this->renameInCpanel('bob', 'robert');
+
+        $this->assertTrue($this->lifecycle()->rename('bob', 'robert'));
+
+        $this->assertNull($this->store->marker('bob', 'restoring'));
+        $this->assertSame('{"x":1}', $this->store->marker('robert', 'restoring')['value']);
+    }
+
     public function test_remove_cleans_files_of_a_corrupt_account(): void
     {
         $this->seed('bob');

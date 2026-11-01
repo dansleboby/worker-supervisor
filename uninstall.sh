@@ -95,6 +95,8 @@ fi
 remove_deployed /usr/local/cpanel/base/frontend/jupiter/worker_supervisor
 remove /usr/local/cpanel/Cpanel/API/WorkerSupervisor.pm /usr/local/cpanel/Cpanel/API/.WorkerSupervisor.pm.new \
   /var/cpanel/perl/Cpanel/Admin/Modules/WorkerSupervisor
+remove /var/cpanel/perl/Cpanel/Pkgacct/Components/WorkerSupervisor.pm \
+  /var/cpanel/perl/Cpanel/Pkgacct/Components/.WorkerSupervisor.pm.new
 
 # WHM: the pages go before the AppConfig, whose removal rebuilds WHM's plugin cache.
 remove_deployed /usr/local/cpanel/whostmgr/docroot/cgi/worker_supervisor

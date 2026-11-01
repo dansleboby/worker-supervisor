@@ -3,7 +3,7 @@
 
 declare(strict_types=1);
 
-// Whostmgr standardized hook, installed as /usr/local/cpanel/3rdparty/bin/worker_supervisor_hook.
+// Whostmgr and PkgAcct standardized hook, installed as /usr/local/cpanel/3rdparty/bin/worker_supervisor_hook.
 // One JSON object on stdin: {context: {category, event, stage, point}, data, hook}.
 //
 // Payload fields, captured on cPanel 11.138 (tests/fixtures/hooks/):
@@ -12,6 +12,8 @@ declare(strict_types=1);
 // - Accounts::Modify: data.user is the old username and data.newuser the new one, identical at
 //   pre and post; newuser is absent when the username does not change.
 // - Accounts::Remove, Accounts::change_package: data.user (plus cur_pkg and new_pkg).
+// - PkgAcct::Restore post: data.user, data.olduser and data.extract_dir (the root-only extracted
+//   archive), once the home directory is restored; JetBackup restores the home after it.
 //
 // Always prints a bare "1": cPanel keeps any text after the status as a hook message, and
 // scripts/suspendacct fails the suspension when a pre hook leaves one, so even "1 ok" can block
@@ -28,6 +30,8 @@ try {
     $payload = json_decode($input, true);
     if (is_array($payload) && \WorkerSupervisor\Lifecycle::route($payload) !== null) {
         \WorkerSupervisor\Container::build(new \WorkerSupervisor\Paths())['lifecycle']->handle($payload);
+    } elseif (is_array($payload) && \WorkerSupervisor\Backup::route($payload) !== null) {
+        \WorkerSupervisor\Container::build(new \WorkerSupervisor\Paths())['backup']->handle($payload);
     }
 } catch (Throwable $e) {
     $detail = $e::class . ': ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine();

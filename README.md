@@ -22,12 +22,12 @@ The design spec lives in `docs/superpowers/specs/`, the implementation plan in `
 As root, keep a copy of the release on the server (the uninstaller runs from it):
 
 ```sh
-git clone --branch v1.0.0 https://github.com/dansleboby/worker-supervisor.git /root/worker-supervisor
+git clone --branch v1.1.0 https://github.com/dansleboby/worker-supervisor.git /root/worker-supervisor
 cd /root/worker-supervisor
 ./install.sh
 ```
 
-Without git: `curl -L https://github.com/dansleboby/worker-supervisor/archive/refs/tags/v1.0.0.tar.gz | tar xz`, then run `./install.sh` from `worker-supervisor-1.0.0/`.
+Without git: `curl -L https://github.com/dansleboby/worker-supervisor/archive/refs/tags/v1.1.0.tar.gz | tar xz`, then run `./install.sh` from `worker-supervisor-1.1.0/`.
 
 **Every account can use it as soon as it is installed.** cPanel turns a plugin feature on in every feature list that does not turn it off, so any account can create workers right after `./install.sh` (the installer prints this reminder). To restrict it, open WHM > Packages > Feature Manager and turn "Worker Supervisor" off in the feature lists that should not have it, or in the special "disabled" list to turn it off for every account. Accounts that lose the feature have their workers stopped within 5 minutes.
 
@@ -116,6 +116,14 @@ Workers belong to the cPanel account that created them, recorded as its uid and 
 journalctl -t worker_supervisor
 ```
 
+**Backups and restores.** An account's workers are part of its cPanel account backup: a pkgacct component adds them to the archive as `worker_supervisor.json`, in WHM backups, transfers, the client's own full backup and JetBackup 5 (whose account configuration is built with pkgacct). Restoring the account (WHM Backup Restoration, `restorepkg`, Transfer Tool or a JetBackup restore that includes the account configuration) brings them back as they were, through a `PkgAcct::Restore` hook:
+
+- The account's workers become those of the backup: missing ones are created, changed ones updated, ones created after the backup deleted; identical ones keep running untouched. Stopped workers stay stopped and admin stops are kept.
+- Folders under the backup's home move to the account's home, so a restore under another username or home path works. Paths inside commands are not rewritten.
+- Each worker goes through the same checks as a client save, against the limits of the server it is restored on: one refused for its limits or template is skipped and logged. Per-account overrides set in WHM are server settings, not part of the archive: after restoring a removed account, set its override again before the restore if its workers need it.
+- A worker whose folder does not exist yet waits (`/var/cpanel/worker_supervisor/accounts/<account>.json.restoring`) and reconcile adds it once the folder is there, for up to 24 hours; it only ever goes to the account it was restored into. JetBackup restores the home directory after the account configuration, so after a JetBackup restore of a removed account the workers come back within 5 minutes.
+- The plugin must be installed on the server that makes the backup and on the one that restores it. A JetBackup restore of the home directory alone does not touch the workers.
+
 **Importing hand-written programs.** The "Import existing .ini files" button of the Workers page lists the programs in `/etc/supervisord.d/*.ini`. Pick one and the owning account, review the changes (the `su` wrapper replaced by the launcher, the folder taken from the `cd`, logs moved, `user=` dropped), then apply: the worker becomes managed and the original file is kept in `/var/cpanel/worker_supervisor/backups/`. A hand-written file supervisor cannot load (for example a program name with a space) makes `supervisorctl reread` and `update` fail for every program, managed ones included, so no worker can be saved, started or restarted until it is fixed or removed.
 
 ## Security model
@@ -134,7 +142,7 @@ The client is untrusted; root-side code accepts a fixed set of actions with vali
 | Path | Content |
 |---|---|
 | `/usr/local/cpanel/3rdparty/worker_supervisor/` | core (PHP, run with cPanel's PHP), `bin/wsv`, launcher `bin/wsv-run`, translations |
-| `/var/cpanel/worker_supervisor/` | worker definitions per account, launch and hold files, settings, import backups |
+| `/var/cpanel/worker_supervisor/` | worker definitions per account (and restores waiting for their folder), launch and hold files, settings, import backups |
 | `/var/log/worker_supervisor/<account>/` | worker logs |
 | `/etc/supervisord.d/wsv_*.ini` | generated programs; do not edit, they are rewritten |
 | `/run/worker_supervisor/` | one lock file per program, which keeps its supervisorctl jobs one at a time (tmpfs, recreated as needed) |
@@ -142,7 +150,8 @@ The client is untrusted; root-side code accepts a fixed set of actions with vali
 | `/usr/local/cpanel/base/frontend/jupiter/worker_supervisor/` | cPanel pages |
 | `/usr/local/cpanel/whostmgr/docroot/cgi/worker_supervisor/` | WHM pages (AppConfig `worker_supervisor`) |
 | `/var/cpanel/packages/extensions/worker_supervisor{,.tt2}` | package extension |
-| `/usr/local/cpanel/3rdparty/bin/worker_supervisor_hook` | account hooks (7 Whostmgr `Accounts::*` registrations) |
+| `/usr/local/cpanel/3rdparty/bin/worker_supervisor_hook` | account hooks (7 Whostmgr `Accounts::*` registrations and `PkgAcct::Restore` post) |
+| `/var/cpanel/perl/Cpanel/Pkgacct/Components/WorkerSupervisor.pm` | pkgacct component that adds the workers to account backups |
 | `/etc/cron.d/worker_supervisor` | reconcile every 5 minutes |
 
 ## Known limits
@@ -150,7 +159,6 @@ The client is untrusted; root-side code accepts a fixed set of actions with vali
 - **Memory limit kills are not reported as such.** The LVE memory limit (PMEM, 1024 MB for the test account) is enforced by the kernel: a worker that exceeds it is killed with SIGKILL. supervisord only sees `terminated by SIGKILL; not expected` in its log. Observed with a worker that allocates without bound: it dies about 1.5 s after each spawn, so it never lasts `startsecs` (10 s) and never reaches RUNNING. Its state cycles STARTING -> BACKOFF (`Exited too quickly`) with growing delays between attempts, until `startretries` (30) is exhausted (FATAL expected then; not waited for). The restart counter is not exposed by `supervisorctl status`. A worker that survives `startsecs` before being killed would instead show RUNNING -> EXITED/STARTING and restart per `autorestart`.
 - A memory kill in one worker does not touch the account's other workers: an `idle` worker (`sleep 3600`) kept RUNNING with an unchanged pid throughout.
 - Graceful stop is only guaranteed for a single command (see above).
-- **Workers are not part of cPanel backups or transfers.** An account restored from a backup or moved to another server comes back without its workers; recreate them there.
 - **Logs are outside the account's disk quota.** Each process keeps up to 40 MB per stream (10 MB plus 3 backups), so an account can fill up to max processes x 2 streams x 40 MB of `/var/log` (800 MB with the default 10 processes).
 - After a username change or an import, the old and new processes can run side by side for up to the stop wait, while the old ones finish their graceful stop. Harmless for queue workers; a daemon that binds a port may fail to start (FATAL) and need a restart.
 - Horizon starts its own children, which the process count and limits cannot see.
@@ -172,6 +180,7 @@ The VM tests run on a local CloudLinux 9 + cPanel QEMU VM managed by `dev/vm/vm.
 dev/deploy.sh                                          # copy the working tree to the VM and run install.sh there
 dev/vm/vm.sh ssh 'bash -s' < tests/vm/launcher.sh     # LAUNCHER OK
 dev/vm/vm.sh ssh 'bash -s' < tests/vm/uapi.sh         # UAPI OK
+dev/vm/vm.sh ssh 'bash -s' < tests/vm/backup.sh       # BACKUP OK (removes and restores wshell; JetBackup part when installed)
 tests/vm/clean-install.sh                              # CLEAN INSTALL OK
 ```
 
