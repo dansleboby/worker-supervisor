@@ -40,6 +40,9 @@ function wsv_change_text(string $change): string
     if (str_starts_with($change, 'key_dropped:')) {
         return substr($change, strlen('key_dropped:')) . ' is not supported and is dropped.';
     }
+    if (str_starts_with($change, 'always_on:')) {
+        return substr($change, strlen('always_on:')) . ' is always on for plugin workers: stopping a worker stops all of its processes.';
+    }
 
     return WSV_CHANGE_TEXT[$change] ?? $change;
 }
@@ -48,7 +51,12 @@ function wsv_change_text(string $change): string
 function wsv_import_issues(array $issues, \WorkerSupervisor\I18n $i18n): void
 {
     foreach ($issues as $issue) {
-        wsv_alert($issue->level === 'error' ? 'danger' : 'warning', $issue->field . ': ' . $i18n->t('issue.' . $issue->code, $issue->params));
+        $kind = match ($issue->level) {
+            'error' => 'danger',
+            'warning' => 'warning',
+            default => 'info',
+        };
+        wsv_alert($kind, $issue->field . ': ' . $i18n->t('issue.' . $issue->code, $issue->params));
     }
 }
 
@@ -191,20 +199,20 @@ function wsv_render_preview(Importer $importer, \WorkerSupervisor\I18n $i18n, st
         '<input type="hidden" name="program" value="', wsv_h($program), '">',
         '<input type="hidden" name="user" value="', wsv_h($user), '">';
     foreach (['template', 'autostart', 'autorestart', 'startsecs', 'startretries', 'stopwaitsecs', 'redirect_stderr'] as $key) {
-        echo '<input type="hidden" name="', $key, '" value="', wsv_h($w[$key]), '">';
+        echo '<input type="hidden" name="', $key, '" value="', wsv_h($w[$key] ?? ''), '">';
     }
     $fields = ['name' => 'Worker name', 'folder' => 'Folder', 'command' => 'Command', 'processes' => 'Processes'];
     foreach ($fields as $key => $label) {
         echo '<div class="form-group"><label for="wsv-import-', $key, '">', wsv_h($label), '</label>',
-            '<input type="text" class="form-control" id="wsv-import-', $key, '" name="', $key, '" value="', wsv_h($w[$key]), '" autocomplete="off"></div>';
+            '<input type="text" class="form-control" id="wsv-import-', $key, '" name="', $key, '" value="', wsv_h($w[$key] ?? ''), '" autocomplete="off"></div>';
     }
     echo '<p class="wsv-muted">', wsv_h(sprintf(
         'Template: %s. Restart if it stops: %s. Start wait %s s, retries %s, stop wait %s s.',
-        $i18n->t('template.' . $w['template']),
-        $w['autorestart'],
-        $w['startsecs'],
-        $w['startretries'],
-        $w['stopwaitsecs'],
+        $i18n->t('template.' . ($w['template'] ?? '')),
+        $w['autorestart'] ?? '',
+        $w['startsecs'] ?? '',
+        $w['startretries'] ?? '',
+        $w['stopwaitsecs'] ?? '',
     )), '</p>',
         '<button type="submit" class="btn btn-primary">Import as ', wsv_h($user), '</button></form>';
 }

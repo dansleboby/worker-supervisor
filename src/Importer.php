@@ -15,11 +15,16 @@ use RuntimeException;
  * parse_ini_string would interpret values such as %(program_name)s.
  *
  * Change codes returned by propose(): wrapper_replaced, directory_from_cd, logs_moved,
- * user_key_dropped, and "key_dropped:<key>".
+ * user_key_dropped, "key_dropped:<key>", and "always_on:<key>" for a stopasgroup or killasgroup
+ * the file turns off.
  */
 final class Importer
 {
     private const KEPT = ['command', 'directory', 'numprocs', 'autostart', 'autorestart', 'startsecs', 'startretries', 'stopwaitsecs', 'redirect_stderr'];
+    /** Set to true on every generated program (IniRenderer). */
+    private const ALWAYS_ON = ['stopasgroup', 'killasgroup'];
+    /** Form fields a file can leave out; propose() fills them with the Worker defaults. */
+    private const DEFAULTED = ['processes', 'autostart', 'autorestart', 'startsecs', 'startretries', 'stopwaitsecs', 'redirect_stderr'];
 
     /** @var (callable(): int)|null */
     private $now;
@@ -338,6 +343,10 @@ final class Importer
                 $logs = true;
             } elseif ($key === 'user') {
                 $changes[] = 'user_key_dropped';
+            } elseif (in_array($key, self::ALWAYS_ON, true)) {
+                if (filter_var($kv[$key], FILTER_VALIDATE_BOOLEAN) !== true) {
+                    $changes[] = 'always_on:' . $key;
+                }
             } elseif ($key === 'directory') {
                 // A directory that disagrees with the cd is the one that gets lost.
                 if ($cdUsed && rtrim($kv['directory'], '/') !== $folder) {
@@ -350,6 +359,7 @@ final class Importer
         if ($logs) {
             $changes[] = 'logs_moved';
         }
+        $worker += array_intersect_key((new Worker('', 'custom', '', ''))->toArray(), array_flip(self::DEFAULTED));
 
         return [$worker, array_values(array_unique($changes))];
     }

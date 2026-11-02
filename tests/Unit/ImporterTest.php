@@ -115,9 +115,22 @@ final class ImporterTest extends TestCase
         $this->assertContains('logs_moved', $p['changes']);
         $this->assertContains('user_key_dropped', $p['changes']);
         $this->assertContains('key_dropped:process_name', $p['changes']);
-        $this->assertContains('key_dropped:stopasgroup', $p['changes']);
+        $this->assertNotContains('key_dropped:stopasgroup', $p['changes'], 'the plugin always sets it');
+        $this->assertNotContains('key_dropped:killasgroup', $p['changes']);
         $this->assertNotContains('key_dropped:directory', $p['changes']);
         $this->assertSame([], $p['issues']);
+    }
+
+    public function test_propose_fills_every_form_field_the_file_leaves_out(): void
+    {
+        $this->place('minimal.ini', "[program:minimal]\ncommand=/bin/su - acme -c \"cd /home/acme/app.example.com && exec php artisan queue:work\"\nstopasgroup=false\n");
+        $p = $this->importer->propose('minimal.ini', 'minimal', 'acme');
+
+        $this->assertSame(
+            ['processes' => 1, 'autostart' => true, 'autorestart' => 'true', 'startsecs' => 10, 'startretries' => 30, 'stopwaitsecs' => 3600, 'redirect_stderr' => true],
+            array_intersect_key($p['worker'], array_flip(['processes', 'autostart', 'autorestart', 'startsecs', 'startretries', 'stopwaitsecs', 'redirect_stderr'])),
+        );
+        $this->assertContains('always_on:stopasgroup', $p['changes']);
     }
 
     public function test_propose_without_wrapper_keeps_command_and_directory(): void
