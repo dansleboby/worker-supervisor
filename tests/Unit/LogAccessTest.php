@@ -179,17 +179,7 @@ final class LogAccessTest extends TestCase
         $this->assertSame([$enter, '--no-fork', 'bob', '/bin/sh', '-c'], array_slice($this->runs[0], 0, 5));
     }
 
-    public function test_a_new_directory_gets_the_account_remounted_when_cagefs_mounts_the_logs(): void
-    {
-        file_put_contents($this->root . '/cagefs.mp', "%/var/log/worker_supervisor\n");
-
-        $this->access()->secure('bob');
-        $this->access()->secure('bob');
-
-        $this->assertSame([['/usr/sbin/cagefsctl', '--remount', 'bob']], $this->runs, 'once, when the directory is new');
-    }
-
-    public function test_a_directory_made_root_only_first_still_gets_the_account_remounted(): void
+    public function test_secure_never_remounts_cagefs(): void
     {
         file_put_contents($this->root . '/cagefs.mp', "%/var/log/worker_supervisor\n");
         // IniRenderer::write makes the directory before Service gives it to the account.
@@ -197,7 +187,19 @@ final class LogAccessTest extends TestCase
 
         $this->access()->secure('bob');
 
-        $this->assertSame([['/usr/sbin/cagefsctl', '--remount', 'bob']], $this->runs);
+        $this->assertSame([], $this->runs, 'a remount would kill the account\'s processes');
+    }
+
+    public function test_prepare_all_makes_a_directory_for_every_cpanel_account(): void
+    {
+        file_put_contents($this->root . '/var/cpanel/users/alice', "OWNER=root\n");
+        file_put_contents($this->root . '/var/cpanel/users/Bad.Name', "OWNER=root\n");
+
+        $this->assertSame(['alice', 'bob'], $this->access()->prepareAll());
+
+        $this->assertSame(02750, $this->mode($this->paths->logDir('bob')));
+        $this->assertSame(0700, $this->mode($this->paths->logDir('alice')), 'no system user in the fake passwd');
+        $this->assertDirectoryDoesNotExist($this->paths->logDir('Bad.Name'));
     }
 
     public function test_restrict_takes_the_logs_of_an_earlier_account_back(): void

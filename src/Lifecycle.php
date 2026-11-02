@@ -96,6 +96,7 @@ final class Lifecycle
             ['Accounts::Modify', 'pre'] => $renamed ? ['prepareRename', [$user, $data['newuser']]] : null,
             ['Accounts::Modify', 'post'] => $renamed ? ['rename', [$user, $data['newuser']]] : null,
             ['Accounts::change_package', 'post'] => ['packageChanged', [$user]],
+            ['Accounts::Create', 'post'] => ['prepareLogs', [$user]],
             default => null,
         };
         if ($route === null) {
@@ -201,6 +202,26 @@ final class Lifecycle
                 $this->sv->stop($program);
             }
         }
+    }
+
+    /**
+     * Create post: the account's log directory exists before its CageFS cage is first mounted, so
+     * its home link works inside CageFS from its first worker on.
+     */
+    public function prepareLogs(string $user): void
+    {
+        $this->assertUser($user);
+        $this->logAccess?->secure($user);
+    }
+
+    /**
+     * A log directory for every cPanel account (install.sh).
+     *
+     * @return list<string>
+     */
+    public function prepareAllLogs(): array
+    {
+        return $this->logAccess?->prepareAll() ?? [];
     }
 
     /** Remove post: cPanel runs it after a partial removal too, so it removes only a gone account. */

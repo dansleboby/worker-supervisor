@@ -127,7 +127,7 @@ registered=$(/usr/local/cpanel/bin/manage_hooks list --output JSON | /usr/local/
     }
   }' "$hook")
 # <category>:<event>:<stage>; PkgAcct:Restore:post restores the workers of a restored account.
-for spec in Whostmgr:Accounts::suspendacct:post Whostmgr:Accounts::unsuspendacct:post \
+for spec in Whostmgr:Accounts::Create:post Whostmgr:Accounts::suspendacct:post Whostmgr:Accounts::unsuspendacct:post \
   Whostmgr:Accounts::Remove:pre Whostmgr:Accounts::Remove:post Whostmgr:Accounts::Modify:pre \
   Whostmgr:Accounts::Modify:post Whostmgr:Accounts::change_package:post PkgAcct:Restore:post; do
   grep -qxF "$spec" <<<"$registered" && continue
@@ -138,19 +138,20 @@ done
 install -m 0644 -o root -g root "$src/cron/worker_supervisor" /etc/cron.d/worker_supervisor
 
 # CageFS shows each account its own log directory only (a % mount), so ~/logs/worker_supervisor
-# also works in SSH, Terminal and cron. cagefs.mp has no drop-in directory.
+# also works in SSH, Terminal and cron. cagefs.mp has no drop-in directory. CageFS applies the line,
+# and sees the directories, when it next mounts each cage: never remounted here, since a remount
+# kills the account's processes (workers, SSH sessions, cron jobs). Every account gets its directory
+# now; the Accounts::Create hook does the same for new accounts.
 mp=/etc/cagefs/cagefs.mp
 mount_line='%/var/log/worker_supervisor'
-if [[ -f $mp ]]; then
-  if ! grep -qxF "$mount_line" "$mp"; then
-    [[ -z $(tail -c 1 "$mp") ]] || echo >>"$mp"
-    printf '%s\n' "$mount_line" >>"$mp"
-  fi
-  # Every time: a remount that failed earlier is retried, and accounts get the directories that
-  # appeared since their last mount.
-  /usr/sbin/cagefsctl --remount-all >/dev/null 2>&1 \
-    || echo "install.sh: warning: cagefsctl --remount-all failed; run it so the logs show inside CageFS" >&2
+cagefs_line_added=0
+if [[ -f $mp ]] && ! grep -qxF "$mount_line" "$mp"; then
+  [[ -z $(tail -c 1 "$mp") ]] || echo >>"$mp"
+  printf '%s\n' "$mount_line" >>"$mp"
+  cagefs_line_added=1
 fi
+"$app/bin/wsv" logs_prepare >/dev/null \
+  || echo "install.sh: warning: wsv logs_prepare failed, see journalctl -t worker_supervisor" >&2
 
 # Workers kept in the data directory by an earlier uninstall come back now, not at the next cron run.
 # An upgrade also gets every account's identity recorded and every launch file rewritten with the
@@ -167,6 +168,16 @@ elif [[ $previous == "$version" ]]; then
   echo "Worker Supervisor $version reinstalled."
 else
   echo "Worker Supervisor upgraded from $previous to $version."
+fi
+if (( cagefs_line_added )); then
+  cat <<'CAGEFS'
+
+Clients can read their worker logs in ~/logs/worker_supervisor/. Inside CageFS (SSH, Terminal),
+existing accounts see them after their cage is next mounted, at the latest on the next reboot; new
+accounts see them at once. To show them now, run: cagefsctl --remount-all
+That restarts the processes of every account in CageFS (workers, SSH sessions, cron jobs): choose a
+quiet moment.
+CAGEFS
 fi
 cat <<'NOTICE'
 

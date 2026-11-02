@@ -1,11 +1,11 @@
 #!/bin/bash
-# Clean-install test, run on the host. Restores the VM to the cloudlinux-clean snapshot (cPanel,
-# CloudLinux and CageFS only: no supervisor, plugin or test accounts), creates the test accounts,
+# Clean-install test, run on the host, on the VM as it is: creates the test accounts if needed,
 # installs, runs the VM tests, checks each uninstall mode and that nothing of the plugin remains,
-# then reinstalls so the VM is left usable. The VM's current state is lost: snapshot it first
-# (dev/vm/vm.sh stop && dev/vm/vm.sh snapshot <name>).
-#   tests/vm/clean-install.sh [--no-restore]
-# --no-restore runs the same steps on the VM as it is.
+# then reinstalls so the VM is left usable.
+#   tests/vm/clean-install.sh [--restore]
+# --restore first restores the cloudlinux-clean snapshot (cPanel, CloudLinux and CageFS only). Avoid
+# it: every restore of that snapshot makes cPanel activate its license again, and repeated
+# activations lock the license (support then needs access to the server to unlock it).
 set -Eeuo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.."
 
@@ -13,7 +13,7 @@ app=/usr/local/cpanel/3rdparty/worker_supervisor
 
 main() {
   trap 'echo "FAIL: line $LINENO: $BASH_COMMAND (exit $?)"' ERR
-  if [[ ${1:-} != --no-restore ]]; then
+  if [[ ${1:-} == --restore ]]; then
     dev/vm/vm.sh stop
     dev/vm/vm.sh restore cloudlinux-clean
     dev/vm/vm.sh start
@@ -35,8 +35,9 @@ main() {
   echo "CLEAN INSTALL OK"
 }
 
+# On stderr: callers send the output of some steps to /dev/null.
 fail() {
-  echo "FAIL: $*"
+  echo "FAIL: $*" >&2
   exit 1
 }
 
@@ -103,7 +104,14 @@ check_uninstall() {
   [[ $("$app/bin/wsv" --version) == "$version" ]] || fail "wsv --version printed '$("$app/bin/wsv" --version)', not $version"
   echo "PASS: wsv --version prints $version"
 
-  # A running two-process worker, and the extension on a package with an account on it.
+  # A running two-process worker, and the extension on a package with an account on it. A keeper
+  # left by an interrupted run goes first.
+  printf '{"user":"wshell","args":{"name":"keeper"}}' | "$app/bin/wsv" delete >/dev/null 2>&1 || true
+  if whmapi1 --output=json listpkgs | jq -e '.data.pkg | any(.name == "wsvclean")' >/dev/null; then
+    [[ $(sed -n 's/^PLAN=//p' /var/cpanel/users/wnoshell) != wsvclean ]] || api changepackage user=wnoshell pkg=default >/dev/null
+    /usr/local/cpanel/scripts/updateuserdomains --force
+    api killpkg pkgname=wsvclean >/dev/null
+  fi
   uapi wshell save_worker name=keeper template=custom folder=/home/wshell command='exec sleep 4242' \
     processes=2 startsecs=1 stopwaitsecs=5 autostart=1 | jq -e '.status == 1' >/dev/null
   wait_for 20 "keeper never reached RUNNING" keeper_running

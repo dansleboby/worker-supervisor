@@ -145,9 +145,9 @@ for dir in /var/log/worker_supervisor/*/; do
 done
 mp=/etc/cagefs/cagefs.mp
 if [[ -f $mp ]] && grep -qxF '%/var/log/worker_supervisor' "$mp"; then
+  # Not remounted: a remount kills every account's processes. Cages drop the mount when next mounted.
   if sed -i '\|^%/var/log/worker_supervisor$|d' "$mp"; then
-    say "removed the CageFS mount of the logs"
-    /usr/sbin/cagefsctl --remount-all >/dev/null 2>&1 || warn "cagefsctl --remount-all failed"
+    say "removed the CageFS mount of the logs (cages drop it when next mounted)"
   else
     warn "cannot edit $mp"
   fi

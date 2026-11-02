@@ -157,6 +157,9 @@ cmd_restore() {
   [[ -n ${1:-} ]] || die "usage: restore <name>"
   is_running && die "stop the VM first"
   qemu-img snapshot -a "$1" "$DISK" && echo "restored '$1'"
+  # Seen with a trial license: each restore of a state from before the current license makes
+  # cPanel activate it again, and a few of those lock it.
+  echo "warning: cPanel may activate its license again at boot; repeated activations lock it" >&2
 }
 
 # -U: read-only listing is safe while QEMU holds the image lock.

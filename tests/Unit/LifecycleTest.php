@@ -254,6 +254,19 @@ final class LifecycleTest extends TestCase
         $this->assertSame(['/usr/sbin/runuser', '-u', 'bob'], array_slice($this->runs[0], 0, 3));
     }
 
+    public function test_account_creation_prepares_the_log_directory_before_cagefs_mounts_the_account(): void
+    {
+        $payload = json_decode((string) file_get_contents(self::FIXTURES . 'create-post.json'), true);
+        $this->assertSame(['prepareLogs', ['wsvcreate']], Lifecycle::route($payload));
+
+        $this->createInCpanel('bob');
+        $payload['data']['user'] = 'bob';
+        $this->assertSame('prepareLogs', $this->lifecycle($this->logAccess())->handle($payload));
+
+        $this->assertSame(02750, fileperms($this->paths->logDir('bob')) & 07777);
+        $this->assertSame([], $this->runs, 'no link before the account has workers, and never a remount');
+    }
+
     public function test_reconcile_never_links_the_logs_of_an_earlier_account_of_the_name(): void
     {
         $this->seed('bob');

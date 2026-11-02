@@ -1,0 +1,20 @@
+{
+  "hook": {
+    "stage": "post",
+    "exectype": "script",
+    "escalateprivs": "0"
+  },
+  "data": {
+    "user": "wsvcreate",
+    "domain": "wsvcreate.test",
+    "plan": "default",
+    "owner": "root",
+    "contactemail": ""
+  },
+  "context": {
+    "category": "Whostmgr",
+    "event": "Accounts::Create",
+    "stage": "post",
+    "point": "main"
+  }
+}

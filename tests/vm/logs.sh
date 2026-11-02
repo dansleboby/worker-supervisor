@@ -44,18 +44,35 @@ main() {
   [[ $(readlink "$link") == "$dir" ]] || fail "the link was not restored"
   echo "PASS: reconcile restores a removed link"
 
-  echo "--- a log directory made after the CageFS mount"
-  other=wnoshell
-  # As for an account whose first worker comes after its cage was mounted.
-  rm -rf "/var/log/worker_supervisor/$other"
-  rm -f "/home/$other/logs/worker_supervisor"
-  cagefsctl --remount "$other" >/dev/null
-  install -d -o "$other" -g "$other" "/home/$other/wsv-logs-app"
+  echo "--- the account's processes survive"
+  setsid cagefs_enter_user "$user" /bin/sh -c 'exec sleep 7802' </dev/null >/dev/null 2>&1 &
+  wait_for 10 "the test process did not start" survivor_running
+  survivor=$(pgrep -f '^sleep 7802$')
+  printf '{"user":"%s","args":{"input":{"name":"logs-second","template":"custom","folder":"%s","command":"exec sleep 7803","startsecs":1,"stopwaitsecs":5}}}' \
+    "$user" "$app" | "$wsv" save | jq -e '.ok' >/dev/null || fail "cannot save logs-second"
+  rm -f "$link"
+  "$wsv" reconcile >/dev/null
+  sleep 2
+  [[ $(pgrep -f '^sleep 7802$') == "$survivor" ]] || fail "saving a worker or reconcile killed the account's processes (CageFS remount?)"
+  kill "$survivor"
+  echo "PASS: saving a worker and reconcile leave the account's other processes alone"
+
+  echo "--- an account created after install"
+  new=wsvlogsnew
+  whmapi1 --output=json createacct username="$new" domain="$new.test" hasshell=1 password="$(openssl rand -base64 24)" \
+    | jq -e '.metadata.result == 1' >/dev/null || fail "createacct $new"
+  [[ $(stat -c '%a %G' "/var/log/worker_supervisor/$new") == "2750 $new" ]] || fail "the Accounts::Create hook did not prepare the log directory"
+  install -d -o "$new" -g "$new" "/home/$new/wsv-logs-app"
   printf '{"user":"%s","args":{"input":{"name":"logs-new","template":"custom","folder":"/home/%s/wsv-logs-app","command":"while true; do echo new-line; sleep 1; done","startsecs":1,"stopwaitsecs":5}}}' \
-    "$other" "$other" | "$wsv" save | jq -e '.ok' >/dev/null || fail "cannot save logs-new"
-  wait_for 20 "$other cannot read its new logs inside CageFS" \
-    cagefs_enter_user "$other" /bin/sh -c "grep -q new-line /home/$other/logs/worker_supervisor/logs-new_00.log"
-  echo "PASS: a new account sees its logs inside CageFS at once"
+    "$new" "$new" | "$wsv" save | jq -e '.ok' >/dev/null || fail "cannot save logs-new"
+  wait_for 20 "$new cannot read its logs inside CageFS" \
+    cagefs_enter_user "$new" /bin/sh -c "grep -q new-line /home/$new/logs/worker_supervisor/logs-new_00.log"
+  echo "PASS: an account created after install reads its logs inside CageFS, no remount"
+
+  other=wnoshell
+  install -d -o "$other" -g "$other" "/home/$other/wsv-logs-app"
+  printf '{"user":"%s","args":{"input":{"name":"logs-new","template":"custom","folder":"/home/%s/wsv-logs-app","command":"exec sleep 7804","startsecs":1,"stopwaitsecs":5}}}' \
+    "$other" "$other" | "$wsv" save | jq -e '.ok' >/dev/null || fail "cannot save logs-new for $other"
 
   echo "--- logs of an earlier account of the name"
   file=/var/cpanel/worker_supervisor/accounts/$other.json
@@ -71,6 +88,10 @@ main() {
   echo "PASS: the logs of an earlier account of the name are root's alone"
 
   echo "LOGS OK"
+}
+
+survivor_running() {
+  pgrep -f '^sleep 7802$' >/dev/null
 }
 
 wait_for() {
@@ -89,6 +110,11 @@ fail() {
 
 cleanup() {
   printf '{"user":"%s","args":{"name":"logs-probe"}}' "$user" | "$wsv" delete >/dev/null 2>&1 || true
+  printf '{"user":"%s","args":{"name":"logs-second"}}' "$user" | "$wsv" delete >/dev/null 2>&1 || true
+  pkill -f '^sleep 7802$' || true
+  if [[ -e /var/cpanel/users/wsvlogsnew ]]; then
+    /scripts/removeacct --force wsvlogsnew >/dev/null 2>&1 || true
+  fi
   printf '{"user":"wnoshell","args":{"name":"logs-new"}}' | "$wsv" delete >/dev/null 2>&1 || true
   rm -rf -- "$app" /home/wnoshell/wsv-logs-app
 }

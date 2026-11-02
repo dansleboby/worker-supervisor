@@ -54,9 +54,12 @@ final class LogAccess
     /**
      * Creates the account's log directory if needed and gives it to the account's group: 2750, so
      * the files supervisord creates there get that group too. Root-only (0700) when the account
-     * has no system user. CageFS mounts only the directories that exist when it mounts the
-     * account, so one the account gets access to now (new, or made root-only by IniRenderer)
-     * gets the account remounted.
+     * has no system user.
+     *
+     * CageFS shows the account only the directories that existed when it mounted the account's
+     * cage, hence prepareAll() at install and the account-creation hook. A directory made later
+     * shows inside CageFS after the account's next remount, never forced here: a CageFS remount
+     * kills the account's processes, workers included (checked on CloudLinux 9).
      */
     public function secure(string $user): void
     {
@@ -76,12 +79,27 @@ final class LogAccess
 
             return;
         }
-        clearstatcache(true, $dir);
-        $shared = filegroup($dir) === $gid && (fileperms($dir) & 07777) === 02750;
         $this->give($dir, $gid, 02750);
-        if (!$shared && $this->cagefsMounted() === true) {
-            $this->runner->run(['/usr/sbin/cagefsctl', '--remount', $user]);
+    }
+
+    /**
+     * A log directory for every cPanel account, so CageFS includes it the next time it mounts each
+     * cage, before the account has any worker.
+     *
+     * @return list<string> the accounts
+     */
+    public function prepareAll(): array
+    {
+        $users = [];
+        foreach (glob(dirname($this->p->cpuserFile('x')) . '/*') ?: [] as $file) {
+            $user = basename($file);
+            if (preg_match('/^[a-z][a-z0-9]{0,15}$/D', $user) === 1 && is_file($file)) {
+                $this->secure($user);
+                $users[] = $user;
+            }
         }
+
+        return $users;
     }
 
     /**

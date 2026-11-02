@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.2] - 2026-11-02
+
+- **The plugin no longer remounts CageFS.** 1.2.0 and 1.2.1 ran `cagefsctl --remount-all` on every install and upgrade, and `cagefsctl --remount <account>` when an account got its first worker. A CageFS remount kills the account's processes: workers (supervisord restarted them), SSH and Terminal sessions, running cron jobs. Now every account gets its log directory at install and at creation (new `Accounts::Create` hook), so CageFS shows it when it next mounts each cage. Existing accounts see `~/logs/worker_supervisor` inside CageFS after their next remount or reboot; the installer says how to do it at a quiet moment.
+- The uninstaller no longer remounts CageFS either.
+
 ## [1.2.1] - 2026-11-02
 
 - WHM pages: cPanel's "Consent and Privacy" slideout no longer reopens on every load once root has made a choice. cPanel serves PHP plugin pages a cached header with the consent state frozen at cache time; the plugin's pages now apply root's live choice.
@@ -35,6 +40,7 @@ First public release.
 - Account suspension, termination, username change and package change handled by cPanel hooks; a 5-minute reconcile repairs drift.
 - English and French interface.
 
+[1.2.2]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.2.2
 [1.2.1]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.2.1
 [1.2.0]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.2.0
 [1.1.1]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.1.1

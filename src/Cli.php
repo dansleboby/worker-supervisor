@@ -14,7 +14,7 @@ use Throwable;
 final class Cli
 {
     /** Root-only actions: take no stdin and no user. */
-    private const ROOT_ACTIONS = ['overview', 'reconcile'];
+    private const ROOT_ACTIONS = ['overview', 'reconcile', 'logs_prepare'];
 
     /**
      * Root acting on any account, for scripts and hooks: same request as user actions, with "user"
@@ -146,6 +146,8 @@ final class Cli
                 return $services['admin']->overview();
             case 'reconcile':
                 return $services['lifecycle']->reconcile() + ['restores' => $services['backup']->resumeAll()];
+            case 'logs_prepare':
+                return ['accounts' => $services['lifecycle']->prepareAllLogs()];
         }
         throw new InvalidArgumentException('Unknown action.');
     }
