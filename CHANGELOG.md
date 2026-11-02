@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] - 2026-11-02
+
+- WHM pages: cPanel's "Consent and Privacy" slideout no longer reopens on every load once root has made a choice. cPanel serves PHP plugin pages a cached header with the consent state frozen at cache time; the plugin's pages now apply root's live choice.
+
 ## [1.2.0] - 2026-11-02
 
 - Clients read their worker log files from their home: `~/logs/worker_supervisor/` links to `/var/log/worker_supervisor/<account>/`, now readable by the account's group (2750) and shown inside CageFS to that account only (`%/var/log/worker_supervisor` in `/etc/cagefs/cagefs.mp`, added by the installer). Read-only; supervisord still writes outside the home. The cPanel Logs page says where they are.
@@ -31,6 +35,7 @@ First public release.
 - Account suspension, termination, username change and package change handled by cPanel hooks; a 5-minute reconcile repairs drift.
 - English and French interface.
 
+[1.2.1]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.2.1
 [1.2.0]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.2.0
 [1.1.1]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.1.1
 [1.1.0]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.1.0

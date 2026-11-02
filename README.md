@@ -22,12 +22,12 @@ The design spec lives in `docs/superpowers/specs/`, the implementation plan in `
 As root, keep a copy of the release on the server (the uninstaller runs from it):
 
 ```sh
-git clone --branch v1.2.0 https://github.com/dansleboby/worker-supervisor.git /root/worker-supervisor
+git clone --branch v1.2.1 https://github.com/dansleboby/worker-supervisor.git /root/worker-supervisor
 cd /root/worker-supervisor
 ./install.sh
 ```
 
-Without git: `curl -L https://github.com/dansleboby/worker-supervisor/archive/refs/tags/v1.2.0.tar.gz | tar xz`, then run `./install.sh` from `worker-supervisor-1.2.0/`.
+Without git: `curl -L https://github.com/dansleboby/worker-supervisor/archive/refs/tags/v1.2.1.tar.gz | tar xz`, then run `./install.sh` from `worker-supervisor-1.2.1/`.
 
 **Every account can use it as soon as it is installed.** cPanel turns a plugin feature on in every feature list that does not turn it off, so any account can create workers right after `./install.sh` (the installer prints this reminder). To restrict it, open WHM > Packages > Feature Manager and turn "Worker Supervisor" off in the feature lists that should not have it, or in the special "disabled" list to turn it off for every account. Accounts that lose the feature have their workers stopped within 5 minutes.
 

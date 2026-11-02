@@ -55,8 +55,14 @@ function wsv_asset(string $file): string
 /** @param string $tab index or settings */
 function wsv_page_start(string $tab): void
 {
-    // WHM::header pastes the title into the page unescaped.
-    WHM::header(wsv_h('Worker Supervisor'), 0, 0);
+    // WHM::header pastes the title into the page unescaped. Its cached header can carry a stale
+    // analytics consent that reopens cPanel's slideout on every load (WhmChrome).
+    $consent = \WorkerSupervisor\WhmChrome::consent();
+    echo \WorkerSupervisor\WhmChrome::withLiveConsent(
+        (string) WHM::getHeaderString(wsv_h('Worker Supervisor'), 0, 0),
+        $consent['analytics'],
+        $consent['dismissed'],
+    );
     $tabs = ['index' => 'Workers', 'settings' => 'Limits'];
     echo '<link rel="stylesheet" href="', wsv_h(wsv_asset('whm.css')), '">', "\n";
     echo '<div class="wsv"><h1 class="wsv-title">Worker Supervisor</h1><nav class="wsv-nav" aria-label="Worker Supervisor">';

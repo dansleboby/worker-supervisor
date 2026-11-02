@@ -1,0 +1,53 @@
+<script>
+    (function() {
+        // Init current consent privacy settings to null. This helps to decide if we have to show slideout on page load
+        // if these values aren't coming from nvdata.
+        var currentConsentSetting = null;
+        var slideoutDismissed = false;
+
+        // currentConsentSetting should be set only if analytics_for_current_user has some value.
+        
+
+
+        slideoutDismissed = false;
+
+        analyticsConsentData.updateView(currentConsentSetting);
+
+        var slideout = slideoutFactory(
+            {
+                id: "analytics",
+                mainContainer: mainContainer,
+                tab: tab,
+                closeButton: closeButton,
+                sessionStorageKey : "analyticsSessionId",
+                onClose: onClose
+            }
+        );
+
+        btnSaveEl.addEventListener("click", handleSaveConsentPrivacySettings);
+
+        /**
+         * Handles Save button click event.
+         */
+        function handleSaveConsentPrivacySettings() {
+            analyticsConsentData.saveConsent(consentSetting.checked);
+        }
+
+        /**
+        * Denies data consent when user closes analytics slide out
+        * without explicitly making a choice to allow or deny data collection
+        */
+        function onClose() {
+            analyticsConsentData.saveSlideoutDismiss();
+            analyticsConsentData.resetSettings();
+        }
+
+        setTimeout(function() {
+            // We should automatically open the slideout ONLY if settings don't exist and the slideout is NOT dismissed.
+            if(currentConsentSetting === null && !slideoutDismissed){
+                slideout.openSlideOut();
+            }
+        }, 2000);
+
+    })();
+</script>
