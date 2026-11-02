@@ -87,7 +87,7 @@ cPanel > Advanced > Worker Supervisor lists the workers with their status, proce
 
 **Graceful stop** is guaranteed for a single command: it replaces the shell, receives supervisord's TERM itself and gets the full stop wait. Compound commands (`a && b`, `cd dir && cmd`) also run, but bash stays in front and supervisord considers the worker stopped as soon as bash exits. Put the directory in the Folder field instead of `cd ... &&`, and keep the command a single command.
 
-**Log files in the home directory.** `~/logs/worker_supervisor/` holds the account's log files (`<worker>_<process>.log`, `.err.log` with separate errors, rotated `.1` to `.3`), read-only: `tail -f ~/logs/worker_supervisor/queue_00.log` in SSH or cPanel's Terminal. It is a link the account itself owns; reconcile recreates it within 5 minutes if it is removed, and leaves alone anything else the client puts at that path.
+**Log files in the home directory.** `~/logs/worker_supervisor/` holds the account's log files (`<worker>_<process>.log`, `.err.log` with separate errors, rotated `.1` to `.3`), read-only: `tail -f ~/logs/worker_supervisor/queue_00.log` in SSH or cPanel's Terminal. It is a link the account itself owns; reconcile recreates it within 5 minutes if it is removed, and leaves alone anything else the client puts at that path. cPanel's File Manager shows it empty (see Known limits).
 
 **SSH and scripts.** The same actions, with the same permissions and limits, are a UAPI module:
 
@@ -167,7 +167,7 @@ The client is untrusted; root-side code accepts a fixed set of actions with vali
 - Horizon starts its own children, which the process count and limits cannot see.
 - A username change does not rewrite absolute paths to the old home inside commands.
 - Resellers have no control over limits or workers in this version.
-- cPanel's File Manager has not been checked with the `~/logs/worker_supervisor` link, which points outside the home; SSH and Terminal work.
+- cPanel's File Manager shows `~/logs/worker_supervisor` as empty: it never follows a link out of the home (`Cpanel::SafeDir`), and the logs cannot live in the home (supervisord writes them as root). Use cPanel's Terminal, SSH, or the plugin's Logs page, which also downloads a log.
 - The cPanel home icon label stays in English for French users.
 - Only CloudLinux 9 has been tested.
 
