@@ -264,6 +264,8 @@ textarea.wsv-code { resize: vertical; }
 }
 .wsv-logs-streams .btn[aria-pressed="true"] { font-weight: 600; }
 
+.wsv-logs-home { margin-top: 8px; font-size: 12px; }
+
 .wsv-logs-text {
   height: 60vh;
   min-height: 240px;

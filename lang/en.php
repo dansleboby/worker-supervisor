@@ -81,6 +81,7 @@ return [
     'logs.confirm_clear' => 'Clear the logs of {name}? Its log files are emptied and older rotated logs are deleted.',
     'logs.empty' => 'Nothing logged yet.',
     'logs.text_label' => 'Log of {name}, process {n}',
+    'logs.home_hint' => 'Your log files are also in ~/logs/worker_supervisor/ (Terminal, SSH), read-only.',
 
     'action.start' => 'Start',
     'action.stop' => 'Stop',

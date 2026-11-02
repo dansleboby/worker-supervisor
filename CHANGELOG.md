@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-11-02
+
+- Clients read their worker log files from their home: `~/logs/worker_supervisor/` links to `/var/log/worker_supervisor/<account>/`, now readable by the account's group (2750) and shown inside CageFS to that account only (`%/var/log/worker_supervisor` in `/etc/cagefs/cagefs.mp`, added by the installer). Read-only; supervisord still writes outside the home. The cPanel Logs page says where they are.
+- The account creates the link itself (runuser); reconcile recreates a removed link and fixes the directory, so an upgrade sets up existing accounts at once. The uninstaller removes the links and the CageFS line.
+
 ## [1.1.1] - 2026-11-02
 
 - WHM import: the preview of a program without `numprocs` (or another optional setting) failed halfway with "wsv_h(): Argument #1 must be of type string, null given", leaving no Import button. Missing settings now take the worker defaults (1 process).
@@ -26,6 +31,7 @@ First public release.
 - Account suspension, termination, username change and package change handled by cPanel hooks; a 5-minute reconcile repairs drift.
 - English and French interface.
 
+[1.2.0]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.2.0
 [1.1.1]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.1.1
 [1.1.0]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dansleboby/worker-supervisor/releases/tag/v1.0.0

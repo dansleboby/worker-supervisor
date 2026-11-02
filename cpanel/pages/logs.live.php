@@ -43,6 +43,7 @@ $t = static fn (string $key): string => wsv_h($i18n->t($key));
             </span>
         </div>
         <pre class="wsv-logs-text" data-wsv="text" tabindex="0" role="log"></pre>
+        <p class="wsv-muted wsv-logs-home"><?= $t('logs.home_hint') ?></p>
     </div>
 </div>
 <script src="<?= wsv_h(wsv_asset('logs.js')) ?>"></script>

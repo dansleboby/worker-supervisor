@@ -62,7 +62,11 @@ deploy_dir "$src/src" "$app/src" 0644
 deploy_dir "$src/bin" "$app/bin" 0755
 deploy_dir "$src/lang" "$app/lang" 0644
 
-install -d -m 0700 -o root -g root "$data" "$data/accounts" "$data/launch" "$data/backups" "$logs"
+install -d -m 0700 -o root -g root "$data" "$data/accounts" "$data/launch" "$data/backups"
+# Crossable, not listable: each account reads its own log directory (root's, its group's) from
+# ~/logs/worker_supervisor; reconcile below sets those directories and links up.
+install -d -m 0711 -o root -g root "$logs"
+chmod 0711 "$logs"
 
 # Installed last so they only go live once the core they forward to is in place.
 install_module() {
@@ -132,6 +136,21 @@ for spec in Whostmgr:Accounts::suspendacct:post Whostmgr:Accounts::unsuspendacct
     --event "${event%:*}" --stage "${spec##*:}" 2>&1) || die "manage_hooks add $spec failed: $out"
 done
 install -m 0644 -o root -g root "$src/cron/worker_supervisor" /etc/cron.d/worker_supervisor
+
+# CageFS shows each account its own log directory only (a % mount), so ~/logs/worker_supervisor
+# also works in SSH, Terminal and cron. cagefs.mp has no drop-in directory.
+mp=/etc/cagefs/cagefs.mp
+mount_line='%/var/log/worker_supervisor'
+if [[ -f $mp ]]; then
+  if ! grep -qxF "$mount_line" "$mp"; then
+    [[ -z $(tail -c 1 "$mp") ]] || echo >>"$mp"
+    printf '%s\n' "$mount_line" >>"$mp"
+  fi
+  # Every time: a remount that failed earlier is retried, and accounts get the directories that
+  # appeared since their last mount.
+  /usr/sbin/cagefsctl --remount-all >/dev/null 2>&1 \
+    || echo "install.sh: warning: cagefsctl --remount-all failed; run it so the logs show inside CageFS" >&2
+fi
 
 # Workers kept in the data directory by an earlier uninstall come back now, not at the next cron run.
 # An upgrade also gets every account's identity recorded and every launch file rewritten with the

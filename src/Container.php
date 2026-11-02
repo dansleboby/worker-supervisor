@@ -23,6 +23,7 @@ final class Container
         $logs = new Logs($p);
         $validator = new WorkerValidator(new LveProbe($runner));
         $features = new WhmapiFeatureChecker($runner);
+        $logAccess = new LogAccess($p, $runner);
 
         $service = new Service(
             $p,
@@ -33,13 +34,14 @@ final class Container
             $logs,
             $validator,
             $cpusers,
+            logAccess: $logAccess,
         );
 
         return [
             'service' => $service,
             'admin' => new AdminService($service, $store, $settings, $sv, $cpusers, $ini),
             'importer' => new Importer($p, $service, $sv, $ini),
-            'lifecycle' => new Lifecycle($store, $settings, $ini, $sv, $logs, $cpusers, $features),
+            'lifecycle' => new Lifecycle($store, $settings, $ini, $sv, $logs, $cpusers, $features, logAccess: $logAccess),
             'backup' => new Backup($p, $store, $settings, $ini, $sv, new WorkerValidator(new NullProbe()), $cpusers, $features),
         ];
     }

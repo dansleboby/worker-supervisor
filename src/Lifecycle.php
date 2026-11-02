@@ -47,6 +47,7 @@ final class Lifecycle
      * @param (callable(string): (array|false))|null $passwdLookup defaults to posix_getpwnam
      * @param (callable(int, string): void)|null $log priority (LOG_*) and message; defaults to syslog,
      *                                                since cron discards reconcile's output
+     * @param LogAccess|null $logAccess keeps each account's read access to its logs from its home
      */
     public function __construct(
         private readonly AccountStore $store,
@@ -58,6 +59,7 @@ final class Lifecycle
         private readonly FeatureChecker $features,
         ?callable $passwdLookup = null,
         ?callable $log = null,
+        private readonly ?LogAccess $logAccess = null,
     ) {
         $this->cpuserLoader = $cpuserLoader;
         $this->passwdLookup = $passwdLookup ?? 'posix_getpwnam';
@@ -359,6 +361,12 @@ final class Lifecycle
             $this->sv->apply($this->ini->programName($new, $name), $runnable);
         }
         ($this->log)(LOG_NOTICE, "Renamed account '$old' to '$new' (" . count($jobs) . ' workers)');
+        try {
+            // The home link still names the old log directory.
+            $this->giveLogAccess($new, $u);
+        } catch (Throwable $e) {
+            ($this->log)(LOG_WARNING, "$new: log access from the home directory: " . $e->getMessage());
+        }
         $this->settings->transaction(static fn (Settings $s) => $s->renameUser($old, $new));
 
         return true;
@@ -371,17 +379,19 @@ final class Lifecycle
      *     removed: list<string>, renamed: list<string>, restored: list<string>, suspended: list<string>,
      *     unsuspended: list<string>, feature_off: list<string>, feature_on: list<string>,
      *     rewritten: list<string>, stopped: list<string>, loaded: list<string>, orphans: list<string>,
-     *     features: string, supervisord: string, errors: list<string>
-     * } accounts per change ("old -> new" for renamed); rewritten, stopped (ran although not runnable),
-     *   loaded (supervisord did not have them) and orphans are program names; features is checked,
-     *   unregistered (flags left alone) or failed; supervisord is checked or down (processes not checked)
+     *     linked: list<string>, features: string, supervisord: string, logs_mount: string, errors: list<string>
+     * } accounts per change ("old -> new" for renamed; linked: home link to the logs made or repaired);
+     *   rewritten, stopped (ran although not runnable), loaded (supervisord did not have them) and orphans
+     *   are program names; features is checked, unregistered (flags left alone) or failed; supervisord is
+     *   checked or down (processes not checked); logs_mount is mounted, missing or no_cagefs
      */
     public function reconcile(): array
     {
         $report = [
             'removed' => [], 'renamed' => [], 'restored' => [], 'suspended' => [], 'unsuspended' => [],
             'feature_off' => [], 'feature_on' => [], 'rewritten' => [], 'stopped' => [], 'loaded' => [],
-            'orphans' => [], 'features' => 'checked', 'supervisord' => 'checked', 'errors' => [],
+            'orphans' => [], 'linked' => [], 'features' => 'checked', 'supervisord' => 'checked',
+            'logs_mount' => 'no_cagefs', 'errors' => [],
         ];
         $fail = function (string $message) use (&$report): void {
             $report['errors'][] = $message;
@@ -435,6 +445,13 @@ final class Lifecycle
                         // The account still exists, so that username change was aborted.
                         $this->store->withLock($user, fn () => $this->store->unmark($user, 'renaming'));
                     }
+                    $u = ($this->cpuserLoader)($user);
+                    if ($u !== null && !$this->store->load($user)->ownedBy($u->identity())) {
+                        // Logs of an earlier account of the name, kept for root like its workers.
+                        $this->logAccess?->restrict($user);
+                    } elseif ($u !== null && $this->giveLogAccess($user, $u)) {
+                        $report['linked'][] = $user;
+                    }
                 } elseif ($removing['since'] < time() - self::GRACE && ($this->cpuserLoader)($user) !== null) {
                     [$changes, $touched] = $this->sync($user, null, $featureOff[$user] ?? null, true);
                     if (isset($changes['errors'])) {
@@ -479,7 +496,31 @@ final class Lifecycle
             }
         }
 
+        $mounted = $this->logAccess?->cagefsMounted();
+        if ($mounted !== null) {
+            $report['logs_mount'] = $mounted ? 'mounted' : 'missing';
+            if (!$mounted) {
+                ($this->log)(LOG_WARNING, 'CageFS does not show the worker logs to their accounts: /etc/cagefs/cagefs.mp lacks '
+                    . LogAccess::CAGEFS_LINE . '. Run install.sh again.');
+            }
+        }
+
         return $report;
+    }
+
+    /**
+     * Creates or fixes the account's log directory and its home link.
+     *
+     * @return bool whether a home link was made or repaired
+     */
+    private function giveLogAccess(string $user, CpUser $u): bool
+    {
+        if ($this->logAccess === null) {
+            return false;
+        }
+        $this->logAccess->secure($user);
+
+        return $this->logAccess->link($u);
     }
 
     /**

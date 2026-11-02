@@ -29,6 +29,7 @@ main() {
   dev/deploy.sh
   vm_test tests/vm/uapi.sh "UAPI OK"
   vm_test tests/vm/launcher.sh "LAUNCHER OK"
+  vm_test tests/vm/logs.sh "LOGS OK"
   vm_test tests/vm/backup.sh "BACKUP OK"
   on_vm check_uninstall
   echo "CLEAN INSTALL OK"
@@ -183,6 +184,7 @@ assert_removed() {
     | grep -vxF -f <(printf '%s\n' "${allowed[@]}" /nonexistent) || true)
   [[ -z $found ]] || fail "left behind: $found"
   [[ ! -e /run/worker_supervisor ]] || fail "left behind: /run/worker_supervisor"
+  ! grep -qxF '%/var/log/worker_supervisor' /etc/cagefs/cagefs.mp || fail "left behind: the CageFS mount line"
   echo "PASS: no plugin files left ($mode)"
 
   ! /usr/local/cpanel/bin/manage_hooks list --output JSON | grep -qF worker_supervisor_hook \

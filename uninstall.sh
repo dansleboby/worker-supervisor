@@ -126,6 +126,33 @@ while pgrep -f "$core" >/dev/null; do
   sleep 1
 done
 
+# Each account's ~/logs/worker_supervisor link, removed as the account (root never writes in a
+# home) and only when it points at the plugin's logs. After the wait above: a save or reconcile
+# still running could make it again.
+for dir in /var/log/worker_supervisor/*/; do
+  [[ -d $dir ]] || continue
+  account=$(basename "$dir")
+  home=$(getent passwd "$account" | cut -d: -f6)
+  [[ -n $home && $home != / && -L $home/logs/worker_supervisor ]] || continue
+  # env -i: runuser passes on the caller's environment, which the account could read in /proc.
+  if env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/sbin/runuser -u "$account" -- /bin/sh -c \
+    'case "$(readlink "$1/logs/worker_supervisor")" in /var/log/worker_supervisor/*) rm -f "$1/logs/worker_supervisor" ;; esac' \
+    sh "$home"; then
+    say "removed the log link in $home/logs"
+  else
+    warn "cannot remove $home/logs/worker_supervisor"
+  fi
+done
+mp=/etc/cagefs/cagefs.mp
+if [[ -f $mp ]] && grep -qxF '%/var/log/worker_supervisor' "$mp"; then
+  if sed -i '\|^%/var/log/worker_supervisor$|d' "$mp"; then
+    say "removed the CageFS mount of the logs"
+    /usr/sbin/cagefsctl --remount-all >/dev/null 2>&1 || warn "cagefsctl --remount-all failed"
+  else
+    warn "cannot edit $mp"
+  fi
+fi
+
 shopt -s nullglob
 inis=(/etc/supervisord.d/wsv_*.ini)
 if (( keep_workers )); then
@@ -217,6 +244,8 @@ else
   for d in "$data" "$logs"; do
     [[ ! -e $d ]] || say "kept $d (--purge deletes it)"
   done
+  # Nothing keeps each account's log directory in step any more (a reused gid could read one).
+  [[ ! -d $logs ]] || chmod 0700 "$logs" || warn "cannot chmod $logs"
 fi
 
 /usr/local/cpanel/scripts/restartsrv_cpsrvd >/dev/null 2>&1 || warn "restartsrv_cpsrvd failed"

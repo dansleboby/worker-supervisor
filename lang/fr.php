@@ -81,6 +81,7 @@ return [
     'logs.confirm_clear' => 'Vider le journal de {name} ? Ses fichiers journaux sont vidés et les anciens journaux archivés sont supprimés.',
     'logs.empty' => 'Rien dans le journal pour le moment.',
     'logs.text_label' => 'Journal de {name}, processus {n}',
+    'logs.home_hint' => 'Vos fichiers journaux sont aussi dans ~/logs/worker_supervisor/ (Terminal, SSH), en lecture seule.',
 
     'action.start' => 'Démarrer',
     'action.stop' => 'Arrêter',

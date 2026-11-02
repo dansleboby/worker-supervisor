@@ -22,12 +22,12 @@ The design spec lives in `docs/superpowers/specs/`, the implementation plan in `
 As root, keep a copy of the release on the server (the uninstaller runs from it):
 
 ```sh
-git clone --branch v1.1.1 https://github.com/dansleboby/worker-supervisor.git /root/worker-supervisor
+git clone --branch v1.2.0 https://github.com/dansleboby/worker-supervisor.git /root/worker-supervisor
 cd /root/worker-supervisor
 ./install.sh
 ```
 
-Without git: `curl -L https://github.com/dansleboby/worker-supervisor/archive/refs/tags/v1.1.1.tar.gz | tar xz`, then run `./install.sh` from `worker-supervisor-1.1.1/`.
+Without git: `curl -L https://github.com/dansleboby/worker-supervisor/archive/refs/tags/v1.2.0.tar.gz | tar xz`, then run `./install.sh` from `worker-supervisor-1.2.0/`.
 
 **Every account can use it as soon as it is installed.** cPanel turns a plugin feature on in every feature list that does not turn it off, so any account can create workers right after `./install.sh` (the installer prints this reminder). To restrict it, open WHM > Packages > Feature Manager and turn "Worker Supervisor" off in the feature lists that should not have it, or in the special "disabled" list to turn it off for every account. Accounts that lose the feature have their workers stopped within 5 minutes.
 
@@ -87,6 +87,8 @@ cPanel > Advanced > Worker Supervisor lists the workers with their status, proce
 
 **Graceful stop** is guaranteed for a single command: it replaces the shell, receives supervisord's TERM itself and gets the full stop wait. Compound commands (`a && b`, `cd dir && cmd`) also run, but bash stays in front and supervisord considers the worker stopped as soon as bash exits. Put the directory in the Folder field instead of `cd ... &&`, and keep the command a single command.
 
+**Log files in the home directory.** `~/logs/worker_supervisor/` holds the account's log files (`<worker>_<process>.log`, `.err.log` with separate errors, rotated `.1` to `.3`), read-only: `tail -f ~/logs/worker_supervisor/queue_00.log` in SSH or cPanel's Terminal. It is a link the account itself owns; reconcile recreates it within 5 minutes if it is removed, and leaves alone anything else the client puts at that path.
+
 **SSH and scripts.** The same actions, with the same permissions and limits, are a UAPI module:
 
 ```sh
@@ -132,7 +134,7 @@ The client is untrusted; root-side code accepts a fixed set of actions with vali
 
 - **Execution:** supervisord runs a root-owned launcher that starts the command as the account through `cagefs_enter_user --no-fork <account> /bin/bash -lc ...` with a clean environment. The launcher refuses (exit 64, reason in the worker's log) an account that is suspended, a worker root holds (a root-only `<worker>.hold` file next to its launch file, present while it is suspended, stopped by administrator, feature off or being removed), and a launch file stored for another uid than the account's. The worker lands in the account's CageFS and LVE and is supervisord's direct child, so `stopasgroup`/`killasgroup` reach all its processes and the stop wait is honoured. `su -` is not used: it cuts jobs off after about 2 seconds and orphans children. An account with `noshell` gains nothing it could not already do through cron inside CageFS.
 - **Client text never reaches supervisord's config parser:** the generated `/etc/supervisord.d/wsv_<account>_<worker>.ini` holds only validated names, numbers and fixed values. Folder and command live in a root-only launch file the launcher reads, so supervisord never splits or `%`-expands them, and no `directory=` points into the client's home.
-- **Logs** are written by supervisord in `/var/log/worker_supervisor/<account>/`, outside the home, so a client cannot turn a log into a symlink to a system file; clients read them only through the plugin. Rotation: 10 MB, 3 backups per log. They do not count against the account's disk quota (see Known limits).
+- **Logs** are written by supervisord in `/var/log/worker_supervisor/<account>/`, outside the home, so a client cannot turn a log into a symlink to a system file. That directory is root's and readable by the account's group only (2750, the files get that group); the logs root is 0711, so no account can list the others. A `%/var/log/worker_supervisor` line in `/etc/cagefs/cagefs.mp` makes CageFS show each account its own directory only, and `~/logs/worker_supervisor` links to it; the link is made by the account (runuser), root never writes in a home. Rotation: 10 MB, 3 backups per log. They do not count against the account's disk quota (see Known limits).
 - **Tools root runs** (supervisorctl, whmapi1, lvectl) get a fixed `PATH` and `LANG`, never the caller's environment.
 - **Validation:** worker names are short lowercase slugs; folders must resolve inside the account's home with no symlink escape; numbers stay within the limits; expert mode accepts only an allow-list of keys.
 - "Stopped by administrator" is an operational control, not a security boundary: the client can run the same command through cron. To block an account for real, turn the feature off for it. Templates are a convenience, not a boundary either: every template runs the client's own code.
@@ -143,7 +145,8 @@ The client is untrusted; root-side code accepts a fixed set of actions with vali
 |---|---|
 | `/usr/local/cpanel/3rdparty/worker_supervisor/` | core (PHP, run with cPanel's PHP), `bin/wsv`, launcher `bin/wsv-run`, translations |
 | `/var/cpanel/worker_supervisor/` | worker definitions per account (and restores waiting for their folder), launch and hold files, settings, import backups |
-| `/var/log/worker_supervisor/<account>/` | worker logs |
+| `/var/log/worker_supervisor/<account>/` | worker logs, linked from `~/logs/worker_supervisor` |
+| `/etc/cagefs/cagefs.mp` | one `%/var/log/worker_supervisor` line, so CageFS shows each account its own logs |
 | `/etc/supervisord.d/wsv_*.ini` | generated programs; do not edit, they are rewritten |
 | `/run/worker_supervisor/` | one lock file per program, which keeps its supervisorctl jobs one at a time (tmpfs, recreated as needed) |
 | `/usr/local/cpanel/Cpanel/API/WorkerSupervisor.pm`, `/var/cpanel/perl/Cpanel/Admin/Modules/WorkerSupervisor/` | UAPI module and the admin module that runs the core as root |
@@ -164,6 +167,7 @@ The client is untrusted; root-side code accepts a fixed set of actions with vali
 - Horizon starts its own children, which the process count and limits cannot see.
 - A username change does not rewrite absolute paths to the old home inside commands.
 - Resellers have no control over limits or workers in this version.
+- cPanel's File Manager has not been checked with the `~/logs/worker_supervisor` link, which points outside the home; SSH and Terminal work.
 - The cPanel home icon label stays in English for French users.
 - Only CloudLinux 9 has been tested.
 
@@ -180,6 +184,7 @@ The VM tests run on a local CloudLinux 9 + cPanel QEMU VM managed by `dev/vm/vm.
 dev/deploy.sh                                          # copy the working tree to the VM and run install.sh there
 dev/vm/vm.sh ssh 'bash -s' < tests/vm/launcher.sh     # LAUNCHER OK
 dev/vm/vm.sh ssh 'bash -s' < tests/vm/uapi.sh         # UAPI OK
+dev/vm/vm.sh ssh 'bash -s' < tests/vm/logs.sh         # LOGS OK
 dev/vm/vm.sh ssh 'bash -s' < tests/vm/backup.sh       # BACKUP OK (removes and restores wshell; JetBackup part when installed)
 tests/vm/clean-install.sh                              # CLEAN INSTALL OK
 ```

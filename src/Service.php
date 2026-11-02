@@ -35,6 +35,7 @@ final class Service
      * @param Paths $p part of the Container contract; nothing here needs it yet
      * @param callable(string): ?CpUser $cpuserLoader
      * @param (callable(): int)|null $now
+     * @param LogAccess|null $logAccess gives the account read access to its logs from its home
      */
     public function __construct(
         Paths $p,
@@ -46,6 +47,7 @@ final class Service
         private readonly WorkerValidator $validator,
         callable $cpuserLoader,
         ?callable $now = null,
+        private readonly ?LogAccess $logAccess = null,
     ) {
         $this->cpuserLoader = $cpuserLoader;
         $this->view = new StatusView($now);
@@ -137,6 +139,16 @@ final class Service
                 return [$a, [$old, $w, $issues, $runnable, $this->ini->write($a, $w, $runnable, $held)]];
             },
         );
+
+        if ($this->logAccess !== null) {
+            try {
+                // Before supervisord creates the log files, so they get the account's group.
+                $this->logAccess->secure($user);
+                $this->logAccess->link($u);
+            } catch (\Throwable) {
+                // The worker runs all the same; reconcile retries and logs what fails.
+            }
+        }
 
         $program = $this->ini->programName($user, $new->name);
         $renamed = $old !== null && $old->name !== $new->name;

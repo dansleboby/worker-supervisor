@@ -10,6 +10,7 @@ use WorkerSupervisor\CpUser;
 use WorkerSupervisor\Identity;
 use WorkerSupervisor\IniRenderer;
 use WorkerSupervisor\Lifecycle;
+use WorkerSupervisor\LogAccess;
 use WorkerSupervisor\Logs;
 use WorkerSupervisor\Paths;
 use WorkerSupervisor\Settings;
@@ -52,7 +53,37 @@ final class LifecycleTest extends TestCase
         exec('rm -rf ' . escapeshellarg($this->root));
     }
 
-    private function lifecycle(): Lifecycle
+    /** @var list<list<string>> commands the LogAccess runner was given */
+    private array $runs = [];
+
+    private function logAccess(): LogAccess
+    {
+        $runner = new class ($this->runs) implements \WorkerSupervisor\Supervisor\Runner {
+            public function __construct(private array &$runs)
+            {
+            }
+
+            public function run(array $argv): array
+            {
+                $this->runs[] = $argv;
+
+                return [0, ''];
+            }
+
+            public function detach(array $argv): void
+            {
+            }
+        };
+
+        return new LogAccess(
+            $this->paths,
+            $runner,
+            fn (string $u): array|false => is_dir($this->home($u)) ? ['name' => $u, 'gid' => posix_getgid(), 'dir' => $this->home($u)] : false,
+            $this->root . '/cagefs.mp',
+        );
+    }
+
+    private function lifecycle(?LogAccess $logAccess = null): Lifecycle
     {
         return new Lifecycle(
             $this->store,
@@ -66,6 +97,7 @@ final class LifecycleTest extends TestCase
             function (int $priority, string $message): void {
                 $this->logged[] = [$priority, $message];
             },
+            $logAccess,
         );
     }
 
@@ -206,6 +238,42 @@ final class LifecycleTest extends TestCase
         $this->assertFileExists($this->paths->iniFile('alice', 'queue'));
         $this->assertFileExists($this->paths->logDir('alice') . '/queue_00.log');
         $this->assertNotNull(Settings::load($this->paths)->override('alice'));
+    }
+
+    public function test_reconcile_gives_each_account_its_logs_and_reports_the_cagefs_mount(): void
+    {
+        $this->seed('bob');
+        file_put_contents($this->root . '/cagefs.mp', "/opt\n");
+
+        $report = $this->lifecycle($this->logAccess())->reconcile();
+
+        $this->assertSame(['bob'], $report['linked']);
+        $this->assertSame('missing', $report['logs_mount']);
+        $this->assertStringContainsString(LogAccess::CAGEFS_LINE, $this->logText());
+        $this->assertSame(02750, fileperms($this->paths->logDir('bob')) & 07777);
+        $this->assertSame(['/usr/sbin/runuser', '-u', 'bob'], array_slice($this->runs[0], 0, 3));
+    }
+
+    public function test_reconcile_never_links_the_logs_of_an_earlier_account_of_the_name(): void
+    {
+        $this->seed('bob');
+        $this->store->save($this->account('bob')->withIdentity(new Identity(999, '1')));
+
+        $report = $this->lifecycle($this->logAccess())->reconcile();
+
+        $this->assertSame([], $report['linked']);
+        $this->assertSame([], $this->runs, 'no home link made');
+    }
+
+    public function test_rename_points_the_home_link_at_the_new_log_directory(): void
+    {
+        $this->seed('bob');
+        $this->renameInCpanel('bob', 'robert');
+
+        $this->assertTrue($this->lifecycle($this->logAccess())->rename('bob', 'robert'));
+
+        $this->assertSame(['/usr/sbin/runuser', '-u', 'robert'], array_slice(end($this->runs), 0, 3));
+        $this->assertSame($this->paths->logDir('robert'), end($this->runs)[9]);
     }
 
     public function test_remove_drops_a_restore_still_waiting_even_without_an_account_file(): void

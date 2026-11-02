@@ -64,7 +64,7 @@ final class ServiceTest extends TestCase
     }
 
     /** @param (callable(string): ?CpUser)|null $loader */
-    private function service(?callable $loader = null): Service
+    private function service(?callable $loader = null, ?\WorkerSupervisor\LogAccess $logAccess = null): Service
     {
         $paths = $this->paths;
         $home = $this->home;
@@ -90,6 +90,7 @@ final class ServiceTest extends TestCase
             new WorkerValidator($probe),
             $loader ?? static fn (string $u): ?CpUser => CpUser::load($paths, $u, static fn () => ['dir' => $home]),
             static fn (): int => self::NOW,
+            $logAccess,
         );
     }
 
@@ -100,6 +101,33 @@ final class ServiceTest extends TestCase
         $home = $this->home;
 
         return static fn (string $u): ?CpUser => CpUser::load($paths, $u, static fn () => ['uid' => $uid, 'dir' => $home]);
+    }
+
+    public function test_save_gives_the_account_its_logs_before_supervisord_starts_the_worker(): void
+    {
+        $runs = [];
+        $runner = new class ($runs) implements \WorkerSupervisor\Supervisor\Runner {
+            public function __construct(private array &$runs)
+            {
+            }
+
+            public function run(array $argv): array
+            {
+                $this->runs[] = $argv;
+
+                return [0, ''];
+            }
+
+            public function detach(array $argv): void
+            {
+            }
+        };
+        $logAccess = new \WorkerSupervisor\LogAccess($this->paths, $runner, static fn () => ['gid' => posix_getgid()], $this->root . '/cagefs.mp');
+
+        $this->service(null, $logAccess)->save('bob', $this->input(), 'form', null);
+
+        $this->assertSame(02750, fileperms($this->paths->logDir('bob')) & 07777);
+        $this->assertSame(['/usr/sbin/runuser', '-u', 'bob'], array_slice($runs[0], 0, 3));
     }
 
     private function input(array $over = []): array
